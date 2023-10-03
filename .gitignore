@@ -8,6 +8,7 @@ __pycache__/
 
 #local
 results/
+data/
 
 # Distribution / packaging
 .vscode/
