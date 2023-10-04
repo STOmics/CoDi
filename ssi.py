@@ -11,6 +11,8 @@ import numpy as np
 import pandas as pd
 import scanpy as sc
 from scipy.spatial.distance import mahalanobis
+from scipy.stats import entropy
+from scipy.stats import wasserstein_distance
 import seaborn as sns
 
 
@@ -144,17 +146,26 @@ def per_cell(ii):
     for subset_id, subset in enumerate(subsets):
         best_match = {"cell_type": "", "dist": 9999999}
         for cell_type in cell_types:
-            distance = mahalanobis(
-                st_df.iloc[ii, :][subset].values,
-                sc_mean[cell_type][subset_id].values,
-                sc_icms[cell_type][subset_id],
-            )
-            # print(cell_type, distance)
+            if args.distance == "mahalanobis":
+                distance = mahalanobis(
+                    st_df.iloc[ii, :][subset].values,
+                    sc_mean[cell_type][subset_id].values,
+                    sc_icms[cell_type][subset_id],
+                )
+            elif args.distance == "KLD":
+                distance = entropy(
+                    st_df.iloc[ii, :][subset].values,
+                    sc_mean[cell_type][subset_id].values,
+                )
+            elif args.distance == "wasserstein":
+                distance = wasserstein_distance(
+                    st_df.iloc[ii, :][subset].values,
+                    sc_mean[cell_type][subset_id].values,
+                )
+
             if distance < best_match["dist"]:
                 best_match = {"cell_type": cell_type, "dist": distance}
         best_matches_subsets.append(best_match)
-        # print('-----')
-    # print(best_matches_subsets)
 
     # Majority voting
     cn = Counter([x["cell_type"] for x in best_matches_subsets])
@@ -163,9 +174,6 @@ def per_cell(ii):
         "confidence": np.round(cn.most_common(1)[0][1] / num_of_subsets, 3),
     }
     return (ii, best_match_subset)
-    # assigned_types.append(best_match_subset)
-    # if ii % 500 == 0:
-    #     print(f"Processed {ii} out of {len(st_df)}.")
 
 
 with mp.Pool(processes=num_cpus_used) as pool:
@@ -177,7 +185,7 @@ end = time.time()
 logger.info(f"Execution took: {end - start}s")
 adata_st.obs["sc_type"] = [x["cell_type"] for x in assigned_types]
 sns.histplot([x["confidence"] for x in assigned_types])
-plt.savefig("ssi_confidence_hist.png", dpi=120, bbox_inches="tight")
+plt.savefig(f"ssi_confidence_hist__{args.distance}.png", dpi=120, bbox_inches="tight")
 
 
 # Visualisation
@@ -227,9 +235,13 @@ fig, axs = plt.subplots(2, 2, figsize=(14, 14))
 sns.histplot(adata_st.obs["sc_type"], ax=axs[0][0])
 sns.histplot(adata_sc.obs["cell_subclass"], ax=axs[0][1])
 plot_spatial(
-    adata_st, annotation="sc_type", spot_size=30, palette=palette, ax=axs[1][0]
+    adata_st,
+    annotation=f"sc_type",
+    spot_size=30,
+    palette=palette,
+    ax=axs[1][0],
 )
 plot_spatial(
     adata_st, annotation="celltype", spot_size=30, palette=palette, ax=axs[1][1]
 )
-plt.savefig("ssi.png", dpi=120, bbox_inches="tight")
+plt.savefig(f"ssi_{args.distance}.png", dpi=120, bbox_inches="tight")
