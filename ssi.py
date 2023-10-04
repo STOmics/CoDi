@@ -1,7 +1,9 @@
 import argparse as ap
 from collections import Counter
 import logging
+import multiprocessing as mp
 import random
+import time
 
 import matplotlib.pyplot as plt
 from matplotlib.axes import Axes
@@ -33,6 +35,15 @@ parser.add_argument(
     default="cell_subclass",
 )
 parser.add_argument(
+    "-d",
+    "--distance",
+    help="Distance metric used to measure the distance between a point and a distribution of points",
+    type=str,
+    required=False,
+    default="mahalanobis",
+    choices={"mahalanobis", "KLD", "wasserstein"},
+)
+parser.add_argument(
     "--num_markers",
     help="Number of marker genes",
     type=int,
@@ -40,11 +51,11 @@ parser.add_argument(
     default=100,
 )
 parser.add_argument(
-    "--num_threads",
-    help="Number of threads that will be used to speed up community calling",
+    "--n_jobs",
+    help="Number of jobs to run in parallel. -1 means using all available processors",
     type=int,
     required=False,
-    default=5,
+    default=-1,
 )
 
 args = parser.parse_args()
@@ -101,7 +112,6 @@ def create_subsets(gene_set, num_of_subsets=10):
 sc_dfs = {}
 sc_icms = {}
 sc_mean = {}
-assigned_types = []
 num_of_subsets = 50
 subsets = create_subsets(markers_intersect, num_of_subsets=num_of_subsets)
 for ty in cell_types:
@@ -122,19 +132,26 @@ for ty in cell_types:
 # *****************************************
 # For all ST cells, for all subsets, for all cell types
 # *****************************************
-for ii in range(len(st_df)):
+start = time.time()
+num_cpus_used = mp.cpu_count() if args.n_jobs == -1 else args.n_jobs
+assigned_types = []
+
+iis = [ii for ii in range(len(st_df))]
+
+
+def per_cell(ii):
     best_matches_subsets = []
-    for sub_id, subset in enumerate(subsets):
+    for subset_id, subset in enumerate(subsets):
         best_match = {"cell_type": "", "dist": 9999999}
-        for ty in cell_types:
-            maha = mahalanobis(
+        for cell_type in cell_types:
+            distance = mahalanobis(
                 st_df.iloc[ii, :][subset].values,
-                sc_mean[ty][sub_id].values,
-                sc_icms[ty][sub_id],
+                sc_mean[cell_type][subset_id].values,
+                sc_icms[cell_type][subset_id],
             )
-            # print(ty, maha)
-            if maha < best_match["dist"]:
-                best_match = {"cell_type": ty, "dist": maha}
+            # print(cell_type, distance)
+            if distance < best_match["dist"]:
+                best_match = {"cell_type": cell_type, "dist": distance}
         best_matches_subsets.append(best_match)
         # print('-----')
     # print(best_matches_subsets)
@@ -145,9 +162,19 @@ for ii in range(len(st_df)):
         "cell_type": cn.most_common(1)[0][0],
         "confidence": np.round(cn.most_common(1)[0][1] / num_of_subsets, 3),
     }
-    assigned_types.append(best_match_subset)
-    if ii % 500 == 0:
-        print(f"Processed {ii} out of {len(st_df)}.")
+    return (ii, best_match_subset)
+    # assigned_types.append(best_match_subset)
+    # if ii % 500 == 0:
+    #     print(f"Processed {ii} out of {len(st_df)}.")
+
+
+with mp.Pool(processes=num_cpus_used) as pool:
+    assigned_types = pool.map(per_cell, iis)
+
+assigned_types.sort(key=lambda x: x[0])
+assigned_types = [at[1] for at in assigned_types]
+end = time.time()
+logger.info(f"Execution took: {end - start}s")
 adata_st.obs["sc_type"] = [x["cell_type"] for x in assigned_types]
 sns.histplot([x["confidence"] for x in assigned_types])
 plt.savefig("ssi_confidence_hist.png", dpi=120, bbox_inches="tight")
