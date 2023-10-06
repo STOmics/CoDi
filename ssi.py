@@ -4,6 +4,7 @@ import logging
 import multiprocessing as mp
 import random
 import time
+import os
 
 import matplotlib.pyplot as plt
 from matplotlib.axes import Axes
@@ -198,7 +199,7 @@ logger.info(f"Execution took: {end - start}s")
 adata_st.obs["sc_type"] = [x["cell_type"] for x in assigned_types]
 sns.histplot([x["confidence"] for x in assigned_types])
 plt.savefig(f"ssi_confidence_hist__{args.distance}.png", dpi=120, bbox_inches="tight")
-adata_st.write_h5ad(args.st_path.replace(".h5ad", "_ssi.h5ad"))
+adata_st.write_h5ad(os.path.basename(args.st_path).replace(".h5ad", "_ssi.h5ad"))
 
 # Visualisation
 def plot_spatial(
