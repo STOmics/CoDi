@@ -17,7 +17,7 @@ import seaborn as sns
 
 
 logging.basicConfig(
-    format="%(asctime)s %(name)-12s %(levelname)-8s %(message)s", level=logging.DEBUG
+    format="%(asctime)s %(name)-12s %(levelname)-8s %(message)s", level=logging.INFO
 )
 logger = logging.getLogger(__name__)
 
@@ -42,7 +42,7 @@ parser.add_argument(
     help="Distance metric used to measure the distance between a point and a distribution of points",
     type=str,
     required=False,
-    default="mahalanobis",
+    default="KLD",
     choices={"mahalanobis", "KLD", "wasserstein"},
 )
 parser.add_argument(
@@ -64,14 +64,23 @@ args = parser.parse_args()
 
 adata_sc = sc.read_h5ad(args.sc_path)
 adata_st = sc.read_h5ad(args.st_path)
+# TODO: Check if matrix is sparse!!!
 sc_df_raw = pd.DataFrame(
-    adata_sc.X, index=adata_sc.obs.index, columns=adata_sc.var.index
+    adata_sc.X.toarray(), index=adata_sc.obs.index, columns=adata_sc.var.index
 ).copy()
 st_df_raw = pd.DataFrame(
     adata_st.X.toarray(), index=adata_st.obs.index, columns=adata_st.var.index
 ).copy()
 
+# Filter cells and genes
+sc.pp.filter_cells(adata_sc, min_genes=100)
+sc.pp.filter_genes(adata_sc, min_cells=5)
+sc.pp.filter_cells(adata_st, min_genes=100)
+sc.pp.filter_genes(adata_st, min_cells=5)
+
+
 # Calculate marker genes
+start_marker = time.time()
 sc.pp.normalize_total(adata_sc, target_sum=1e4)
 sc.pp.log1p(adata_sc)
 adata_sc.var_names_make_unique()
@@ -92,7 +101,11 @@ markers_intersect = list(set(markers).intersection(adata_st.var.index))
 logger.info(
     f"Using {len(markers_intersect)} single cell marker genes that exist in ST dataset"
 )
-
+end_marker = time.time()
+marker_time = np.round(end_marker - start_marker, 3)
+logger.info(
+    f"Calculation of marker genes took {marker_time}"
+)
 sc_df = sc_df_raw.loc[:, markers_intersect]
 st_df = st_df_raw.loc[:, markers_intersect]
 cell_types = set(adata_sc.obs[args.annotation])
@@ -121,7 +134,7 @@ for ty in cell_types:
     sc_icms[ty] = []
     sc_mean[ty] = []
     for sub_id, subset in enumerate(subsets):
-        subset_df = sc_df[adata_sc.obs["cell_subclass"] == ty][subset]
+        subset_df = sc_df[adata_sc.obs[args.annotation] == ty][subset]
         sc_dfs[ty].append(subset_df)
         cm = np.cov(subset_df.values, rowvar=False)  # Calculate covariance matrix
         sc_icms[ty].append(
@@ -139,7 +152,6 @@ num_cpus_used = mp.cpu_count() if args.n_jobs == -1 else args.n_jobs
 assigned_types = []
 
 iis = [ii for ii in range(len(st_df))]
-
 
 def per_cell(ii):
     best_matches_subsets = []
@@ -186,7 +198,7 @@ logger.info(f"Execution took: {end - start}s")
 adata_st.obs["sc_type"] = [x["cell_type"] for x in assigned_types]
 sns.histplot([x["confidence"] for x in assigned_types])
 plt.savefig(f"ssi_confidence_hist__{args.distance}.png", dpi=120, bbox_inches="tight")
-
+adata_st.write_h5ad(args.st_path.replace(".h5ad", "_ssi.h5ad"))
 
 # Visualisation
 def plot_spatial(
@@ -224,24 +236,24 @@ def plot_spatial(
     ax.set_aspect("equal")
     sns.despine(bottom=True, left=True, ax=ax)
 
-
-palette = {
-    "DGGRC2": "#ffffcc",
-    "ACNT1": "r",
-    "TEGLU10": "#a1dab4",
-    "TEGLU17": "#41b6c4",
-}
-fig, axs = plt.subplots(2, 2, figsize=(14, 14))
-sns.histplot(adata_st.obs["sc_type"], ax=axs[0][0])
-sns.histplot(adata_sc.obs["cell_subclass"], ax=axs[0][1])
-plot_spatial(
-    adata_st,
-    annotation=f"sc_type",
-    spot_size=30,
-    palette=palette,
-    ax=axs[1][0],
-)
-plot_spatial(
-    adata_st, annotation="celltype", spot_size=30, palette=palette, ax=axs[1][1]
-)
-plt.savefig(f"ssi_{args.distance}.png", dpi=120, bbox_inches="tight")
+# TODO: Add visualize parameter
+# palette = {
+#     "DGGRC2": "#ffffcc",
+#     "ACNT1": "r",
+#     "TEGLU10": "#a1dab4",
+#     "TEGLU17": "#41b6c4",
+# }
+# fig, axs = plt.subplots(2, 2, figsize=(14, 14))
+# sns.histplot(adata_st.obs["sc_type"], ax=axs[0][0])
+# sns.histplot(adata_sc.obs["cell_subclass"], ax=axs[0][1])
+# plot_spatial(
+#     adata_st,
+#     annotation=f"sc_type",
+#     spot_size=30,
+#     palette=palette,
+#     ax=axs[1][0],
+# )
+# plot_spatial(
+#     adata_st, annotation="celltype", spot_size=30, palette=palette, ax=axs[1][1]
+# )
+# plt.savefig(f"ssi_{args.distance}.png", dpi=120, bbox_inches="tight")
