@@ -11,6 +11,6 @@
     ],
     "hq_path": "/goofys/projects/SSI/datasets/mouse_brain_visium_cell2location/sc_raw.h5ad",
     "annotation": "annotation_1",
-    "command": "python ssi.py --sc_path hq_path --st_path lq_path -a annotation_1",
+    "command": "python ssi.py --sc_path hq_path --st_path lq_path -a annotation",
     "output_suffix": "ssi"
 }
