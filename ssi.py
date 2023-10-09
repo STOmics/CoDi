@@ -65,6 +65,13 @@ args = parser.parse_args()
 
 adata_sc = sc.read_h5ad(args.sc_path)
 adata_st = sc.read_h5ad(args.st_path)
+
+# Filter cells and genes
+# sc.pp.filter_cells(adata_sc, min_genes=100)
+# sc.pp.filter_genes(adata_sc, min_cells=5)
+# sc.pp.filter_cells(adata_st, min_genes=100)
+# sc.pp.filter_genes(adata_st, min_cells=5)
+
 # TODO: Check if matrix is sparse!!!
 sc_df_raw = pd.DataFrame(
     adata_sc.X.toarray(), index=adata_sc.obs.index, columns=adata_sc.var.index
@@ -72,13 +79,6 @@ sc_df_raw = pd.DataFrame(
 st_df_raw = pd.DataFrame(
     adata_st.X.toarray(), index=adata_st.obs.index, columns=adata_st.var.index
 ).copy()
-
-# Filter cells and genes
-sc.pp.filter_cells(adata_sc, min_genes=100)
-sc.pp.filter_genes(adata_sc, min_cells=5)
-sc.pp.filter_cells(adata_st, min_genes=100)
-sc.pp.filter_genes(adata_st, min_cells=5)
-
 
 # Calculate marker genes
 start_marker = time.time()
