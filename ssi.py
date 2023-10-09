@@ -14,6 +14,7 @@ import scanpy as sc
 from scipy.spatial.distance import mahalanobis
 from scipy.stats import entropy
 from scipy.stats import wasserstein_distance
+from scipy.sparse import issparse
 import seaborn as sns
 
 
@@ -72,12 +73,14 @@ adata_st = sc.read_h5ad(args.st_path)
 # sc.pp.filter_cells(adata_st, min_genes=100)
 # sc.pp.filter_genes(adata_st, min_cells=5)
 
-# TODO: Check if matrix is sparse!!!
+# Read datasets and check if matrix is sparse
 sc_df_raw = pd.DataFrame(
-    adata_sc.X.toarray(), index=adata_sc.obs.index, columns=adata_sc.var.index
+    adata_sc.X.toarray() if issparse(adata_sc.X) else adata_sc.X,
+    index=adata_sc.obs.index, columns=adata_sc.var.index
 ).copy()
 st_df_raw = pd.DataFrame(
-    adata_st.X.toarray(), index=adata_st.obs.index, columns=adata_st.var.index
+    adata_st.X.toarray() if issparse(adata_st.X) else adata_st.X,
+    index=adata_st.obs.index, columns=adata_st.var.index
 ).copy()
 
 # Calculate marker genes
