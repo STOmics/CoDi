@@ -42,7 +42,7 @@ out_df = pd.DataFrame()
 for lq_path in lq_paths:
     print(f"Processing {lq_path}")
     
-    command_gen = command_gen.replace("hq_path", hq_path).replace("lq_path", lq_path)
+    command = command_gen.replace("hq_path", hq_path).replace("lq_path", lq_path)
     lq_path_pred = os.path.basename(lq_path).replace(".h5ad", f"_{algo_suffix}.h5ad")
     if not os.path.exists(lq_path_pred):
         return_code = subprocess.call(command.split(" "))

@@ -1,5 +1,6 @@
 {
     "lq_paths": [
+            "/goofys/projects/SSI/datasets/mouse_brain_visium_cell2location/sc_raw.h5ad",
             "/goofys/projects/SSI/datasets/mouse_brain_visium_cell2location/synthetic_sc_0.05.h5ad",
             "/goofys/projects/SSI/datasets/mouse_brain_visium_cell2location/synthetic_sc_0.1.h5ad",
             "/goofys/projects/SSI/datasets/mouse_brain_visium_cell2location/synthetic_sc_0.2.h5ad",
@@ -10,6 +11,6 @@
     ],
     "hq_path": "/goofys/projects/SSI/datasets/mouse_brain_visium_cell2location/sc_raw.h5ad",
     "annotation": "annotation_1",
-    "command": "python ssi.py --sc_path hq_path --st_path lq_path -a annotation",
+    "command": "python ssi.py --sc_path hq_path --st_path lq_path -a annotation_1",
     "output_suffix": "ssi"
 }
