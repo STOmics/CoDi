@@ -16,6 +16,7 @@ from scipy.stats import entropy
 from scipy.stats import wasserstein_distance
 from scipy.sparse import issparse
 import seaborn as sns
+from tqdm import tqdm
 
 
 logging.basicConfig(
@@ -189,12 +190,13 @@ def per_cell(ii):
         "cell_type": cn.most_common(1)[0][0],
         "confidence": np.round(cn.most_common(1)[0][1] / num_of_subsets, 3),
     }
+    pbar.update(1)  # global variable
     return (ii, best_match_subset)
 
-
+pbar = tqdm(total=len(st_df))
 with mp.Pool(processes=num_cpus_used) as pool:
     assigned_types = pool.map(per_cell, iis)
-
+    
 assigned_types.sort(key=lambda x: x[0])
 assigned_types = [at[1] for at in assigned_types]
 end = time.time()
