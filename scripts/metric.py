@@ -1,6 +1,7 @@
 import os
 import argparse as ap
 import logging
+import time
 
 import scanpy as sc
 import pandas as pd
@@ -8,6 +9,7 @@ import numpy as np
 # import seaborn as sns
 # import matplotlib.pyplot as plt
 
+start_time = time.time()
 logging.basicConfig(
     format="%(asctime)s %(name)-12s %(levelname)-8s %(message)s", level=logging.INFO
 )
@@ -90,12 +92,17 @@ if "rank_genes_groups" not in adata_st.uns:
     sc.pp.filter_genes(adata_st, min_cells=5)
     sc.pp.normalize_total(adata_st, target_sum=1e4)
     sc.pp.log1p(adata_st)
-    adata_sc.var_names_make_unique()
+    adata_st.var_names_make_unique()
     sc.tl.rank_genes_groups(adata_st, groupby=annotation_st, use_raw=False)
     markers_st_df = pd.DataFrame(adata_st.uns["rank_genes_groups"]["names"])
     markers_st = list(np.unique(markers_st_df.melt().value.values))
     pval_st_df = pd.DataFrame(adata_st.uns["rank_genes_groups"]["pvals_adj"])
 
+# Remove genes that does not exist in ST
+for ctype, genes in markers_per_type_reduced_dict.items():
+    st_genes = list(adata_st.var.index)
+    markers_per_type_reduced_dict[ctype] = \
+    list(filter(lambda x: x in st_genes, markers_per_type_reduced_dict[ctype]))
 
 markers_per_type_st_dict = dict()
 for col in markers_st_df.columns:
@@ -121,9 +128,13 @@ for ctype, genes in markers_per_type_st_dict.items():  # Can be merged with prev
     total_marker_genes_sc += marker_genes_sc
     print(ctype, dif)
 
-logger.info(f'Total marker genes in scRNA (for {len(markers_st_df.columns)} cell types): {total_marker_genes_sc}')
+logger.info(f'Total marker genes in scRNA that also exist in ST (for {len(markers_st_df.columns)} cell types): {total_marker_genes_sc}')
 logger.info(f'Remained marker genes in ST: {total_marker_genes_sc - lost_genes}')
 
-
+end_time = time.time()
+total_time = np.round(end_time - start_time, 3)
+logger.info(
+    f"Execution took {total_time}"
+)
 
 
