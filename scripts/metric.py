@@ -39,13 +39,18 @@ parser.add_argument(
     default="celltype",
 )
 
+parser.add_argument(
+    "--st_cell_type_path", help="CSV with spatially resolved dataset cell types", type=str, required=True
+)
+
+
 args = parser.parse_args()
 
 adata_sc = sc.read_h5ad(args.sc_path)
 adata_st = sc.read_h5ad(args.st_path)
 annotation = args.annotation
 annotation_st = args.annotation_st
-
+st_cell_type_path = args.st_cell_type_path
 
 if "markers_per_type_reduced_dict" not in adata_sc.uns:
     # Calculate marker genes
@@ -85,15 +90,26 @@ if "markers_per_type_reduced_dict" not in adata_sc.uns:
 else:
     markers_per_type_reduced_dict = adata_sc.uns["markers_per_type_reduced_dict"]
     logger.info("Found markers_per_type_reduced_dict in adata_sc.uns")
-    
+
+# Read ST cell type annotations from CSV
+st_cell_types_df = pd.read_csv(st_cell_type_path)
+st_cell_types_df.set_index(st_cell_types_df.columns[-2], inplace=True)
+st_annotation = st_cell_types_df.columns[-1]
+
+# Add annotation from CSV to AnnData so we can calculate marker genes
+adata_st.obs = pd.merge(adata_st.obs, st_cell_types_df, left_index=True, right_index=True)
+adata_st.obs
+
+
 # Calculate ST marker genes
 if "rank_genes_groups" not in adata_st.uns:
+    logger.info("Calculating ST marker genes.")
     sc.pp.filter_cells(adata_st, min_genes=100)
     sc.pp.filter_genes(adata_st, min_cells=5)
     sc.pp.normalize_total(adata_st, target_sum=1e4)
     sc.pp.log1p(adata_st)
     adata_st.var_names_make_unique()
-    sc.tl.rank_genes_groups(adata_st, groupby=annotation_st, use_raw=False)
+    sc.tl.rank_genes_groups(adata_st, groupby=st_annotation, use_raw=False)
     markers_st_df = pd.DataFrame(adata_st.uns["rank_genes_groups"]["names"])
     markers_st = list(np.unique(markers_st_df.melt().value.values))
     pval_st_df = pd.DataFrame(adata_st.uns["rank_genes_groups"]["pvals_adj"])
