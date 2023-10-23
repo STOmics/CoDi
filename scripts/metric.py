@@ -2,6 +2,7 @@ import os
 import argparse as ap
 import logging
 import time
+from collections import Counter
 
 import scanpy as sc
 import pandas as pd
@@ -107,8 +108,15 @@ st_cell_types_df = pd.read_csv(st_cell_type_path)
 st_cell_types_df.set_index(st_cell_types_df.columns[-2], inplace=True)
 st_annotation = st_cell_types_df.columns[-1]
 
+# Exclude cell types with less than 10 cells
+c = Counter(st_cell_types_df[st_cell_types_df.columns[-1]])
+exclude_types = {el for el in c.elements() if c[el] <= 5}
+st_cell_types_df.loc[:, st_cell_types_df.columns[-1]] = st_cell_types_df[st_cell_types_df.columns[-1]].apply(lambda x: x if x not in exclude_types else "FILTERED")
+
 # Add annotation from CSV to AnnData so we can calculate marker genes
 adata_st.obs = pd.merge(adata_st.obs, st_cell_types_df, left_index=True, right_index=True)
+
+adata_st = adata_st[adata_st.obs[st_annotation] != "FILTERED"]
 
 # Calculate ST marker genes
 if "rank_genes_groups" not in adata_st.uns:
@@ -162,4 +170,9 @@ logger.info(
     f"Execution took {total_time}"
 )
 
+report_dict = {"sc_marker_genes": total_marker_genes_sc, "st_marker_genes_25": (total_marker_genes_sc - lost_genes), \
+               "st_cell_types": len(markers_st_df.columns)}
 
+if not os.path.exists("data/reports"):
+    os.makedirs("data/reports")
+pd.DataFrame(report_dict, index=["val"]).to_csv("data/reports/" + st_cell_type_path.split("/")[-1], index=False)
