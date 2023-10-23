@@ -72,6 +72,14 @@ if "markers_per_type_reduced_dict" not in adata_sc.uns:
     for col in markers_df.columns:
         markers_per_type_dict[col] = markers_df.loc[pval_df[col] < 0.05, col].values
 
+    # Marker gene count
+    gene_marker_times = {gene: 0 for gene in adata_sc.var.index}
+    for col in markers_df.columns:
+        for gene in adata_sc.var.index:
+            if gene in markers_per_type_dict[col]:
+                gene_marker_times[gene] += 1
+        print(f'Processed {col}')
+
     markers_per_type_reduced_dict = {}
     for col in markers_df.columns:
         reduced_gene_set = set()
@@ -87,6 +95,9 @@ if "markers_per_type_reduced_dict" not in adata_sc.uns:
         df.loc[:, 'pval'] = pval_df.loc[df.index, col]
         df.sort_values(by='pval', inplace=True)  # Sort by p-val to obtain ranks
         markers_per_type_reduced_dict[col] = list(df[col])
+
+    adata_sc.uns["markers_per_type_reduced_dict"] = markers_per_type_reduced_dict
+    adata_sc.write_h5ad(os.path.basename(args.sc_path))
 else:
     markers_per_type_reduced_dict = adata_sc.uns["markers_per_type_reduced_dict"]
     logger.info("Found markers_per_type_reduced_dict in adata_sc.uns")
@@ -98,8 +109,6 @@ st_annotation = st_cell_types_df.columns[-1]
 
 # Add annotation from CSV to AnnData so we can calculate marker genes
 adata_st.obs = pd.merge(adata_st.obs, st_cell_types_df, left_index=True, right_index=True)
-adata_st.obs
-
 
 # Calculate ST marker genes
 if "rank_genes_groups" not in adata_st.uns:
