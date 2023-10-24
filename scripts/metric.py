@@ -138,17 +138,16 @@ logger.info(
     f"Calculate ST marker genes - execution took {marker_time} so far"
 )
 # Calculate ST marker genes
-if "rank_genes_groups" not in adata_st.uns:
-    logger.info("Calculating ST marker genes.")
-    sc.pp.filter_cells(adata_st, min_genes=100)
-    sc.pp.filter_genes(adata_st, min_cells=5)
-    sc.pp.normalize_total(adata_st, target_sum=1e4)
-    sc.pp.log1p(adata_st)
-    adata_st.var_names_make_unique()
-    sc.tl.rank_genes_groups(adata_st, groupby=st_annotation, use_raw=False)
-    markers_st_df = pd.DataFrame(adata_st.uns["rank_genes_groups"]["names"])
-    markers_st = list(np.unique(markers_st_df.melt().value.values))
-    pval_st_df = pd.DataFrame(adata_st.uns["rank_genes_groups"]["pvals_adj"])
+logger.info("Calculating ST marker genes.")
+sc.pp.filter_cells(adata_st, min_genes=100)
+sc.pp.filter_genes(adata_st, min_cells=5)
+sc.pp.normalize_total(adata_st, target_sum=1e4)
+sc.pp.log1p(adata_st)
+adata_st.var_names_make_unique()
+sc.tl.rank_genes_groups(adata_st, groupby=st_annotation, use_raw=False)
+markers_st_df = pd.DataFrame(adata_st.uns["rank_genes_groups"]["names"])
+markers_st = list(np.unique(markers_st_df.melt().value.values))
+pval_st_df = pd.DataFrame(adata_st.uns["rank_genes_groups"]["pvals_adj"])
 
 st_marker_time2 = time.time()
 marker_time = np.round(st_marker_time2 - st_marker_time, 3)
