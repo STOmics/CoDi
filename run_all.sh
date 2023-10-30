@@ -7,7 +7,7 @@ python ssi.py --st_path /goofys/Samples/Stereo_seq/Mouse_brain/adult_mouse_brain
 python ssi.py --st_path /goofys/Samples/Stereo_seq/Mouse_brain/adult_mouse_brain_ST7k.h5ad --sc_path /goofys/Samples/sc_reference/adult_mouse_brain_SC7k.h5ad -a cell_subclass
 
 # Adult mouse brain stereo-seq (celltype_pred)
-python ssi.py --st_path /goofys/Samples/Stereo_seq/Mouse_brain/SS200000141TL_B5.h5ad --sc_path /goofys/Samples/sc_reference/mouse_brain_L5.h5ad  -a cell_subclass
+python ssi.py --st_path /goofys/Samples/Stereo_seq/Mouse_brain/SS200000141TL_B5.h5ad --sc_path /goofys/projects/SSI/datasets/mouse_brain_L5.h5ad  -a cell_subclass --n_jobs 36
 
 # Mouse brain 16.5 stereo-seq (sim anno)
 python ssi.py --st_path /goofys/Samples/Stereo_seq/E16.5_E1S3_cell_bin_whole_brain_noborderct.h5ad --sc_path /goofys/Samples/sc_reference/mouse_brain_L5.h5ad  -a cell_subclass
@@ -16,7 +16,7 @@ python ssi.py --st_path /goofys/Samples/Stereo_seq/E16.5_E1S3_cell_bin_whole_bra
 python ssi.py --st_path /goofys/Samples/10X/mouse_brain_visium_cell2location.h5ad --sc_path /goofys/Samples/sc_reference/visium_mouse_brain_cell2location.h5ad -a annotation_1
 
 # Mop MERFISH (all 12 slices)
-python ssi.py --st_path /goofys/Samples/MERFISH_dataset/mop_merfish_ST.h5ad --sc_path /goofys/Samples/sc_reference/mop_merfish.h5ad -a Allen.cluster_label
+python ssi.py --st_path /goofys/Samples/MERFISH_dataset/mop/merfish13864.h5ad --sc_path /goofys/Samples/sc_reference/mop_merfish.h5ad -a Allen.cluster_label
 
 # Benchmark synthetic visium
 #python scripts/benchmark.py test/config_40k_visium.json

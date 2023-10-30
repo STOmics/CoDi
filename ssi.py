@@ -67,6 +67,8 @@ args = parser.parse_args()
 
 adata_sc = sc.read_h5ad(args.sc_path)
 adata_st = sc.read_h5ad(args.st_path)
+adata_sc.var_names_make_unique()
+adata_st.var_names_make_unique()
 
 # Filter cells and genes
 # sc.pp.filter_cells(adata_sc, min_genes=100)
@@ -86,12 +88,15 @@ st_df_raw = pd.DataFrame(
 
 # Calculate marker genes
 start_marker = time.time()
-sc.pp.normalize_total(adata_sc, target_sum=1e4)
-sc.pp.log1p(adata_sc)
-adata_sc.var_names_make_unique()
-sc.pp.highly_variable_genes(adata_sc, inplace=True, n_top_genes=200)
+if "rank_genes_groups" not in adata_sc.uns:
+    sc.pp.normalize_total(adata_sc, target_sum=1e4)
+    sc.pp.log1p(adata_sc)
+    adata_sc.var_names_make_unique()
+    sc.pp.highly_variable_genes(adata_sc, inplace=True, n_top_genes=200)
+    sc.tl.rank_genes_groups(adata_sc, groupby=args.annotation, use_raw=False)
+else:
+    logger.info(f"***d Using precalculated marker genes in input h5ad.")
 
-sc.tl.rank_genes_groups(adata_sc, groupby=args.annotation, use_raw=False)
 markers_df = pd.DataFrame(adata_sc.uns["rank_genes_groups"]["names"]).iloc[
     0 : args.num_markers, :
 ]
@@ -129,22 +134,23 @@ def create_subsets(gene_set, num_of_subsets=10):
 # *****************************************
 # Precalculate inverse covariance matrices
 # *****************************************
-sc_dfs = {}
+# sc_dfs = {}
 sc_icms = {}
 sc_mean = {}
-num_of_subsets = 50
+num_of_subsets = 20
 subsets = create_subsets(markers_intersect, num_of_subsets=num_of_subsets)
 for ty in cell_types:
-    sc_dfs[ty] = []
+    # sc_dfs[ty] = []
     sc_icms[ty] = []
     sc_mean[ty] = []
     for sub_id, subset in enumerate(subsets):
         subset_df = sc_df[adata_sc.obs[args.annotation] == ty][subset]
-        sc_dfs[ty].append(subset_df)
-        cm = np.cov(subset_df.values, rowvar=False)  # Calculate covariance matrix
-        sc_icms[ty].append(
-            np.linalg.pinv(cm)
-        )  # Use pseudo inverse to avoid error singular matrix (determinant = 0)
+        # sc_dfs[ty].append(subset_df)
+        if args.distance == "mahalanobis":
+            cm = np.cov(subset_df.values, rowvar=False)  # Calculate covariance matrix
+            sc_icms[ty].append(
+                np.linalg.pinv(cm)
+            )  # Use pseudo inverse to avoid error singular matrix (determinant = 0)
         sc_mean[ty].append(
             subset_df.mean()
         )  # ...because of presence of genes with all zero values per cell type
@@ -193,10 +199,13 @@ def per_cell(ii):
     pbar.update(1)  # global variable
     return (ii, best_match_subset)
 
+logger.info(
+    f"Starting parallel per cell calculation of distances."
+)
 pbar = tqdm(total=len(st_df))
 with mp.Pool(processes=num_cpus_used) as pool:
     assigned_types = pool.map(per_cell, iis)
-    
+
 assigned_types.sort(key=lambda x: x[0])
 assigned_types = [at[1] for at in assigned_types]
 end = time.time()
