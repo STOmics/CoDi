@@ -166,7 +166,7 @@ for sc_dict_name, sc_dict in zip(["unique marker genes", "top 100 marker genes"]
         list(filter(lambda x: x in st_genes, sc_dict[ctype]))
 
     markers_per_type_st_dict = dict()
-    for col in markers_st_df.columns:
+    for col in set(markers_st_df.columns).intersection(set(sc_dict.keys())):
         df = pd.DataFrame(markers_st_df[col])
         df.loc[:, 'pval'] = pval_st_df.loc[df.index, col]
         df.sort_values(by='pval', inplace=True)  # Sort by p-val to obtain ranks

@@ -13,7 +13,10 @@ python ssi.py --st_path /goofys/Samples/Stereo_seq/Mouse_brain/SS200000141TL_B5.
 python ssi.py --st_path /goofys/Samples/Stereo_seq/E16.5_E1S3_cell_bin_whole_brain_noborderct.h5ad --sc_path /goofys/Samples/sc_reference/mouse_brain_L5.h5ad  -a cell_subclass
 
 # Mouse brain visium 40K cells
-python ssi.py --st_path /goofys/Samples/10X/mouse_brain_visium_cell2location.h5ad --sc_path /goofys/Samples/sc_reference/visium_mouse_brain_cell2location.h5ad -a annotation_1
+python ssi.py --st_path /goofys/Samples/10X/mouse_brain_visium_cell2location.h5ad --sc_path /goofys/projects/SSI/datasets/mouse_brain_visium_cell2location/visium_mouse_brain_cell2location_sc.h5ad -a annotation_1
+
+# Mouse kidney 43636x31053
+python ssi.py --st_path /goofys/Samples/slide_seq/cellxgene_kidney_slide_seq_v2/Puck_191223_19_corr.h5ad --sc_path /goofys/Samples/sc_reference/mouse_kidney/GSE157079_P0_adult.h5ad -a clusters
 
 # Mop MERFISH (all 12 slices)
 python ssi.py --st_path /goofys/Samples/MERFISH_dataset/mop/merfish13864.h5ad --sc_path /goofys/Samples/sc_reference/mop_merfish.h5ad -a Allen.cluster_label
