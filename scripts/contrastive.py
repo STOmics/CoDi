@@ -14,6 +14,7 @@ import pandas as pd
 import scipy
 from sklearn.base import BaseEstimator, TransformerMixin
 from sklearn.preprocessing import LabelEncoder
+from sklearn.model_selection import train_test_split
 import torch
 import torch.nn as nn
 from torch.nn.functional import cosine_similarity
@@ -312,6 +313,7 @@ class ContrastiveEncoder(BaseEstimator, TransformerMixin):
         self.model = None
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.loss_history = []
+        self.val_loss_history = []
 
     def fit(self, X: np.ndarray, y: Optional[np.ndarray] = None):
         """Instantiate and train DeepEncoder that will try to minimize the loss between anchor and positive view
@@ -321,20 +323,43 @@ class ContrastiveEncoder(BaseEstimator, TransformerMixin):
             X (Pandas Dataframe): Rows are samples, columns are features
             y (Array): Binary targets for all samples in data
         """
-        self.data = X
-        self.y = y
+        X_train, X_val, y_train, y_val = train_test_split(
+            X, y, test_size=0.1, random_state=42, stratify=y
+        )
+        self.data = X_train
+        self.y = y_train
         # Limit number of negatives
         self.num_of_negatives = np.min(
             [self.num_of_negatives] + list(Counter(y).values())
         )
+
         self.contr_ds = ContrastiveDataset(
-            X.to_numpy() if isinstance(X, pd.DataFrame) else X,
-            y,
+            X_train.to_numpy()
+            if isinstance(X_train, pd.DataFrame)
+            else X_train,
+            y_train,
             num_of_negatives=self.num_of_negatives,
-            columns=X.columns if isinstance(X, pd.DataFrame) else None,
+            columns=X_train.columns if isinstance(X_train, pd.DataFrame) else None,
+        )
+
+        self.contr_ds_val = ContrastiveDataset(
+            X_val.to_numpy() if isinstance(X_val, pd.DataFrame) else X_val,
+            y_val,
+            num_of_negatives=self.num_of_negatives,
+            columns=X_val.columns if isinstance(X_val, pd.DataFrame) else None,
         )
 
         train_loader = DataLoader(
+            self.contr_ds,
+            batch_size=self.batch_size,
+            pin_memory=True,
+            num_workers=8,
+            persistent_workers=True,
+            prefetch_factor=3,
+            shuffle=True,
+        )
+
+        val_loader = DataLoader(
             self.contr_ds,
             batch_size=self.batch_size,
             pin_memory=True,
@@ -354,6 +379,7 @@ class ContrastiveEncoder(BaseEstimator, TransformerMixin):
         ntxent_loss = CombinedLoss(class_weights=self.class_weights).to(self.device)
 
         loss_history = []
+        val_loss_history = []
 
         # Train contrastive learning encoder
         epochs_tqdm = (
@@ -405,10 +431,54 @@ class ContrastiveEncoder(BaseEstimator, TransformerMixin):
                 epoch_loss += anchor.size(0) * loss.item()
                 if self.verbose > 0:
                     epochs_tqdm.set_postfix({"loss": loss.item()})
+
+            # validation
+            self.model.eval()
+            val_loss = 0.0
+            with torch.no_grad():
+                for anchor, positive, negative, anchor_target in val_loader:
+                    anchor, positive, negative, anchor_target = (
+                        anchor.to(self.device),
+                        positive.to(self.device),
+                        negative.to(self.device),
+                        anchor_target.to(self.device),
+                    )
+                # get embeddings
+                emb_anchor, emb_positive, emb_negative, log_reg = self.model(
+                    anchor, positive, negative
+                )
+
+                # compute loss
+                if epoch <= self.contrastive_only_perc * self.epochs:
+                    # consider only contrastive loss until encoder trains enough
+                    loss = ntxent_loss(emb_anchor, emb_positive, emb_negative)
+                else:
+                    #  Take logistic reg loss into account
+                    if self.freeze_encoder:
+                        # First, freeze weights of contrastive encoder!
+                        for param in self.model.encoder.parameters():
+                            param.requires_grad = False
+                    if self.freeze_hidden and self.hidden_depth > 0:
+                        for param in self.model.hidden_layer.parameters():
+                            param.requires_grad = False
+                    loss = ntxent_loss(
+                        emb_anchor,
+                        emb_positive,
+                        emb_negative,
+                        anchor_target,
+                        log_reg,
+                    )
+                val_loss += anchor.size(0) * loss.item()
+
             print(f"Epoch: {epoch}")
             epoch_loss = epoch_loss / len(train_loader.dataset)
             loss_history.append(epoch_loss)
+
+            avg_val_loss = val_loss / len(val_loader.dataset)
+            val_loss_history.append(avg_val_loss)
+
         self.loss_history = loss_history
+        self.val_loss_history = val_loss_history
         return self
 
     def load_model(path: str):
@@ -530,6 +600,7 @@ def subset_marker_genes(adata_sc, adata_st):
 
 def plot_loss_curve(ce, path):
     plt.plot(ce.loss_history)
+    plt.plot(ce.val_loss_history)
     plt.title("model loss")
     plt.ylabel("loss")
     plt.xlabel("epoch")
@@ -616,6 +687,11 @@ if __name__ == "__main__":
         encoder_depth=8,
         hidden_depth=4,
     )
+
+    X_train, X_test, y_train, y_test = train_test_split(
+        X, y_le, test_size=0.1, random_state=42, stratify=y_le
+    )
+
     ce.fit(X, y_le)
     logger.info("Finished training...")
     model_save_path = f"models/{X.shape[0]}_cells_{timestamp}.pt"
