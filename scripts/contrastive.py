@@ -118,11 +118,18 @@ class MLP(torch.nn.Sequential):
     def __init__(self, input_dim, hidden_dim, n_layers, dropout=0.0):
         layers = []
         in_dim = input_dim
-        for _ in range(n_layers - 1):
-            layers.append(torch.nn.Linear(in_dim, hidden_dim))
+        if n_layers < 2:
+            raise ValueError("n_layers must be at least 2.")
+
+        step = (input_dim - hidden_dim) // (n_layers - 1)
+        hidden_sizes = [input_dim - i * step for i in range(1, n_layers)]
+
+        for hidden_dim_size in hidden_sizes:
+            layers.append(torch.nn.Linear(in_dim, hidden_dim_size))
+            layers.append(torch.nn.BatchNorm1d(hidden_dim_size))  # testing
             layers.append(nn.ReLU(inplace=True))
             layers.append(torch.nn.Dropout(dropout))
-            in_dim = hidden_dim
+            in_dim = hidden_dim_size
 
         layers.append(torch.nn.Linear(in_dim, hidden_dim))
         super().__init__(*layers)
@@ -324,7 +331,7 @@ class ContrastiveEncoder(BaseEstimator, TransformerMixin):
             y (Array): Binary targets for all samples in data
         """
         X_train, X_val, y_train, y_val = train_test_split(
-            X, y, test_size=0.1, random_state=42, stratify=y
+            X, y, test_size=0.2, random_state=42, stratify=y
         )
         self.data = X_train
         self.y = y_train
@@ -334,9 +341,7 @@ class ContrastiveEncoder(BaseEstimator, TransformerMixin):
         )
 
         self.contr_ds = ContrastiveDataset(
-            X_train.to_numpy()
-            if isinstance(X_train, pd.DataFrame)
-            else X_train,
+            X_train.to_numpy() if isinstance(X_train, pd.DataFrame) else X_train,
             y_train,
             num_of_negatives=self.num_of_negatives,
             columns=X_train.columns if isinstance(X_train, pd.DataFrame) else None,
@@ -360,10 +365,10 @@ class ContrastiveEncoder(BaseEstimator, TransformerMixin):
         )
 
         val_loader = DataLoader(
-            self.contr_ds,
+            self.contr_ds_val,
             batch_size=self.batch_size,
             pin_memory=True,
-            num_workers=8,
+            num_workers=4,
             persistent_workers=True,
             prefetch_factor=3,
         )
@@ -380,6 +385,10 @@ class ContrastiveEncoder(BaseEstimator, TransformerMixin):
 
         loss_history = []
         val_loss_history = []
+
+        best_val_loss = float("inf")
+        no_improvement_count = 0
+        patience = 5
 
         # Train contrastive learning encoder
         epochs_tqdm = (
@@ -451,7 +460,7 @@ class ContrastiveEncoder(BaseEstimator, TransformerMixin):
                 # compute loss
                 if epoch <= self.contrastive_only_perc * self.epochs:
                     # consider only contrastive loss until encoder trains enough
-                    loss = ntxent_loss(emb_anchor, emb_positive, emb_negative)
+                    loss_val = ntxent_loss(emb_anchor, emb_positive, emb_negative)
                 else:
                     #  Take logistic reg loss into account
                     if self.freeze_encoder:
@@ -461,21 +470,33 @@ class ContrastiveEncoder(BaseEstimator, TransformerMixin):
                     if self.freeze_hidden and self.hidden_depth > 0:
                         for param in self.model.hidden_layer.parameters():
                             param.requires_grad = False
-                    loss = ntxent_loss(
+                    loss_val = ntxent_loss(
                         emb_anchor,
                         emb_positive,
                         emb_negative,
                         anchor_target,
                         log_reg,
                     )
-                val_loss += anchor.size(0) * loss.item()
+                val_loss += anchor.size(0) * loss_val.item()
 
-            print(f"Epoch: {epoch}")
+            if epoch % 10 == 0:
+                print(f"Epoch: {epoch}")
+
             epoch_loss = epoch_loss / len(train_loader.dataset)
             loss_history.append(epoch_loss)
 
             avg_val_loss = val_loss / len(val_loader.dataset)
             val_loss_history.append(avg_val_loss)
+
+            if avg_val_loss < best_val_loss:
+                best_val_loss = avg_val_loss
+                no_improvement_count = 0
+            else:
+                no_improvement_count += 1
+
+            if no_improvement_count >= patience and False:
+                print(f"Early stopping after {epoch+1} epochs without improvement.")
+                break
 
         self.loss_history = loss_history
         self.val_loss_history = val_loss_history
@@ -599,9 +620,10 @@ def subset_marker_genes(adata_sc, adata_st):
 
 
 def plot_loss_curve(ce, path):
-    plt.plot(ce.loss_history)
-    plt.plot(ce.val_loss_history)
-    plt.title("model loss")
+    plt.plot(ce.loss_history, label="Training loss")
+    plt.plot(ce.val_loss_history, label="Validation loss")
+    plt.legend(loc="upper left")
+    plt.title("Model loss")
     plt.ylabel("loss")
     plt.xlabel("epoch")
     plt.savefig(path)
@@ -683,9 +705,9 @@ if __name__ == "__main__":
     ce = ContrastiveEncoder(
         out_dim=len(le.classes_),
         epochs=args.epochs,
-        emb_dim=64,
-        encoder_depth=8,
-        hidden_depth=4,
+        emb_dim=16,
+        encoder_depth=4,
+        hidden_depth=2,
     )
 
     X_train, X_test, y_train, y_test = train_test_split(
@@ -698,31 +720,43 @@ if __name__ == "__main__":
     ce.save_model(model_save_path)
     logger.info(f"Saved the model to {model_save_path}")
     plot_loss_curve(
-        ce, f"loss_curves/loss_size_{X.shape[0]}_cells_{len(le.classes_)}.png"
+        ce,
+        f"loss_curves/loss_size_{X.shape[0]}_cells_{len(le.classes_)}_epochs_{args.epochs}_{timestamp}.png",
     )
 
     # testing
-    logger.info("--------------------------")
+    logger.info("----------------------------")
     logger.info(f"Model trained on: {args.sc_path}")
+
+    y_pred = ce.predict(X_test)
+    y_true = y_test
+    acc = accuracy_score(le.inverse_transform(y_true), le.inverse_transform(y_pred))
+    f1 = f1_score(
+        le.inverse_transform(y_true), le.inverse_transform(y_pred), average="macro"
+    )
+    logger.info("----------------------------")
+    logger.info(f"Accuracy: {acc}")
+    logger.info(f"F1 macro score: {f1}")
+    logger.info("----------------------------")
     # files = """/goofys/projects/SSI/datasets/4K/Mouse_brain_SC_0.05.h5ad,/goofys/projects/SSI/datasets/4K/Mouse_brain_SC_0.1.h5ad,/goofys/projects/SSI/datasets/4K/Mouse_brain_SC_0.2.h5ad,/goofys/projects/SSI/datasets/4K/Mouse_brain_SC_0.3.h5ad,/goofys/projects/SSI/datasets/4K/Mouse_brain_SC_0.5.h5ad,/goofys/projects/SSI/datasets/4K/Mouse_brain_SC_0.7.h5ad,/goofys/projects/SSI/datasets/4K/Mouse_brain_SC_0.9.h5ad"""
-    files = """/goofys/Samples/Stereo_seq/Mouse_brain/SS200000141TL_B5.h5ad"""
-    files = files.split(",")
-    for file in files:
-        ad = sc.read(file)
-        ad.var_names_make_unique()
-        ad = ad[:, markers_intersect]
-        if not scipy.sparse.issparse(ad.X):
-            ad.X = scipy.sparse.csr_matrix(ad.X)
-            # logger.info(f"Converted SC gene exp matrix of {file} to csr")
-        y_pred = ce.predict(ad.X.toarray())
-        y_true = ad.obs[args.annotation_st]
-        acc = accuracy_score(y_true, le.inverse_transform(y_pred))
-        f1 = f1_score(y_true, le.inverse_transform(y_pred), average="macro")
-        logger.info(f"Results for: {file}")
-        logger.info(f"Accuracy: {acc}")
-        logger.info(f"F1 macro score: {f1}")
-        logger.info("-------------------------")
-        ad.obs["contrastive"] = le.inverse_transform(y_pred)
-        fname = file.split(".")[-1]
-        ad.obs["contrastive"].to_csv(f"contrastive_res/{fname}.csv")
-        # implement saving
+    # files = """/goofys/Samples/Stereo_seq/Mouse_brain/SS200000141TL_B5.h5ad"""
+    # files = files.split(",")
+    # for file in files:
+    #     ad = sc.read(file)
+    #     ad.var_names_make_unique()
+    #     ad = ad[:, markers_intersect]
+    #     if not scipy.sparse.issparse(ad.X):
+    #         ad.X = scipy.sparse.csr_matrix(ad.X)
+    #         # logger.info(f"Converted SC gene exp matrix of {file} to csr")
+    #     y_pred = ce.predict(ad.X.toarray())
+    #     y_true = ad.obs[args.annotation_st]
+    #     acc = accuracy_score(y_true, le.inverse_transform(y_pred))
+    #     f1 = f1_score(y_true, le.inverse_transform(y_pred), average="macro")
+    #     logger.info(f"Results for: {file}")
+    #     logger.info(f"Accuracy: {acc}")
+    #     logger.info(f"F1 macro score: {f1}")
+    #     logger.info("-------------------------")
+    #     ad.obs["contrastive"] = le.inverse_transform(y_pred)
+    #     fname = file.split(".")[-1]
+    #     ad.obs["contrastive"].to_csv(f"contrastive_res/{fname}.csv")
+    # implement saving
