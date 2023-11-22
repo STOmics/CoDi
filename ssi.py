@@ -258,22 +258,23 @@ def plot_spatial(
     ax.set_aspect("equal")
     sns.despine(bottom=True, left=True, ax=ax)
 
-fig, axs = plt.subplots(1, 2, figsize=(14, 14))
-plot_spatial(
-    adata_st,
-    annotation=f"sc_type",
-    spot_size=50,
-    ax=axs[0],
-    title="Cell types"
-)
-plot_spatial(
-    adata_st,
-    annotation=f"confidence",
-    spot_size=50,
-    ax=axs[1],
-    title="Confidence map"
-)
-plt.savefig(os.path.basename(args.st_path).replace(".h5ad", "_ssi.png"), dpi=120, bbox_inches="tight")
+if "spatial" in adata_st.obsm_keys():
+    fig, axs = plt.subplots(1, 2, figsize=(14, 14))
+    plot_spatial(
+        adata_st,
+        annotation=f"sc_type",
+        spot_size=50,
+        ax=axs[0],
+        title="Cell types"
+    )
+    plot_spatial(
+        adata_st,
+        annotation=f"confidence",
+        spot_size=50,
+        ax=axs[1],
+        title="Confidence map"
+    )
+    plt.savefig(os.path.basename(args.st_path).replace(".h5ad", "_ssi.png"), dpi=120, bbox_inches="tight")
 
 end = time.time()
 logger.info(f"Total execution time: {end - start}s")
