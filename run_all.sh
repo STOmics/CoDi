@@ -18,6 +18,9 @@ python ssi.py --st_path /goofys/Samples/10X/mouse_brain_visium_cell2location.h5a
 # Mouse kidney 43636x31053
 python ssi.py --st_path /goofys/Samples/slide_seq/cellxgene_kidney_slide_seq_v2/Puck_191223_19_corr.h5ad --sc_path /goofys/Samples/sc_reference/mouse_kidney/GSE157079_P0_adult.h5ad -a clusters
 
+# Human heart dataset
+python ssi.py --st_path /goofys/Samples/sc_reference/GSE121893_heart_4933_cells.h5ad --sc_path /goofys/Samples/sc_reference/GSE183852_heart.h5ad -a cell_type --n_jobs 24
+
 # Mop MERFISH (all 12 slices)
 python ssi.py --st_path /goofys/Samples/MERFISH_dataset/mop/merfish13864.h5ad --sc_path /goofys/Samples/sc_reference/mop_merfish.h5ad -a Allen.cluster_label
 
