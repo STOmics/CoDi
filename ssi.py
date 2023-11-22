@@ -251,7 +251,6 @@ def plot_spatial(
         palette=palette if ('float' in str(type(adata.obs[annotation][0])).lower()) else None,
         marker="."
     )
-    print(type(adata.obs[annotation][0]))
     ax.invert_yaxis()
     ax.set(yticklabels=[], xticklabels=[], title=title)
     ax.tick_params(bottom=False, left=False)
