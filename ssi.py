@@ -209,15 +209,20 @@ with mp.Pool(processes=num_cpus_used) as pool:
 assigned_types.sort(key=lambda x: x[0])
 assigned_types = [at[1] for at in assigned_types]
 end = time.time()
-logger.info(f"Execution took: {end - start}s")
+logger.info(f"SSI execution took: {end - start}s")
 adata_st.obs["sc_type"] = [x["cell_type"] for x in assigned_types]
-sns.histplot([x["confidence"] for x in assigned_types])
-plt.savefig(f"ssi_confidence_hist__{args.distance}.png", dpi=120, bbox_inches="tight")
+adata_st.obs['confidence'] = [x["confidence"] for x in assigned_types]
+# sns.histplot([x["confidence"] for x in assigned_types])
+# plt.savefig(f"ssi_confidence_hist__{args.distance}.png", dpi=120, bbox_inches="tight")
+
+# Write CSV and H5AD
+adata_st.obs.index.name = 'cell_id'
+adata_st.obs[["sc_type"]].to_csv(os.path.basename(args.st_path).replace(".h5ad", "_ssi.csv"))
 adata_st.write_h5ad(os.path.basename(args.st_path).replace(".h5ad", "_ssi.h5ad"))
 
 # Visualisation
 def plot_spatial(
-    adata, annotation, ax: Axes, spot_size: float, palette=None, title: str = ""
+    adata, annotation, ax: plt.Axes, spot_size: float, palette=None, title: str = ""
 ):
     """
     Scatter plot in spatial coordinates.
@@ -232,6 +237,7 @@ def plot_spatial(
         - title (str): Title of the figure
 
     """
+    palette = sns.color_palette("coolwarm", as_cmap=True)
     s = spot_size * 0.5
     data = adata
     ax = sns.scatterplot(
@@ -242,8 +248,8 @@ def plot_spatial(
         ax=ax,
         s=s,
         linewidth=0,
-        palette=palette,
-        marker=".",
+        palette=palette if ('float' in str(type(adata.obs[annotation][0])).lower()) else None,
+        marker="."
     )
     ax.invert_yaxis()
     ax.set(yticklabels=[], xticklabels=[], title=title)
@@ -251,24 +257,23 @@ def plot_spatial(
     ax.set_aspect("equal")
     sns.despine(bottom=True, left=True, ax=ax)
 
-# TODO: Add visualize parameter
-# palette = {
-#     "DGGRC2": "#ffffcc",
-#     "ACNT1": "r",
-#     "TEGLU10": "#a1dab4",
-#     "TEGLU17": "#41b6c4",
-# }
-# fig, axs = plt.subplots(2, 2, figsize=(14, 14))
-# sns.histplot(adata_st.obs["sc_type"], ax=axs[0][0])
-# sns.histplot(adata_sc.obs["cell_subclass"], ax=axs[0][1])
-# plot_spatial(
-#     adata_st,
-#     annotation=f"sc_type",
-#     spot_size=30,
-#     palette=palette,
-#     ax=axs[1][0],
-# )
-# plot_spatial(
-#     adata_st, annotation="celltype", spot_size=30, palette=palette, ax=axs[1][1]
-# )
-# plt.savefig(f"ssi_{args.distance}.png", dpi=120, bbox_inches="tight")
+if "spatial" in adata_st.obsm_keys():
+    fig, axs = plt.subplots(1, 2, figsize=(14, 14))
+    plot_spatial(
+        adata_st,
+        annotation=f"sc_type",
+        spot_size=50,
+        ax=axs[0],
+        title="Cell types"
+    )
+    plot_spatial(
+        adata_st,
+        annotation=f"confidence",
+        spot_size=50,
+        ax=axs[1],
+        title="Confidence map"
+    )
+    plt.savefig(os.path.basename(args.st_path).replace(".h5ad", "_ssi.png"), dpi=120, bbox_inches="tight")
+
+end = time.time()
+logger.info(f"Total execution time: {end - start}s")
