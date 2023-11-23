@@ -4,6 +4,7 @@ from collections import defaultdict
 import datetime
 import logging
 from typing import Optional
+import time
 import random
 import os
 from zoneinfo import ZoneInfo
@@ -20,10 +21,10 @@ import torch
 import torch.nn as nn
 from torch.nn.functional import cosine_similarity
 from torch.utils.data import Dataset
+from torch.cuda.amp import GradScaler
 from torch.optim import Adam
 from torch.utils.data import DataLoader
 from tqdm.auto import tqdm
-
 from sklearn.metrics import (
     accuracy_score,
     f1_score,
@@ -32,6 +33,8 @@ from sklearn.metrics import (
     roc_curve,
     auc,
 )
+
+from contrastive_augmentation import augment_data
 
 dirs = ["logs", "loss_curves", "contrastive_res", "models"]
 for d in dirs:
@@ -50,7 +53,7 @@ logger = logging.getLogger(__name__)
 
 
 class CombinedLoss(nn.Module):
-    def __init__(self, temperature=1.0, contrastive_weight=0.75, class_weights=None):
+    def __init__(self, temperature=0.7, contrastive_weight=0.75, class_weights=None):
         """Loss for contrastive learning using cosine distance as similarity metric.
 
         Args:
@@ -73,6 +76,10 @@ class CombinedLoss(nn.Module):
             float: loss
         """
         batch_size = z_i.size(0)
+
+        # First, one needs to apply an L2 normalization to the features
+        # z_i = F.normalize(proj_1, p=2, dim=1)
+        # z_j = F.normalize(proj_2, p=2, dim=1)
 
         # compute similarity between the sample's embeddings
         z = torch.cat([z_i, z_j], dim=0)
@@ -150,9 +157,9 @@ class DeepEncoder(nn.Module):
         """
         super().__init__()
         self.hidden_depth = hidden_depth
-        self.encoder = MLP(input_dim, emb_dim, encoder_depth)
+        self.encoder = MLP(input_dim, emb_dim, encoder_depth, dropout=0.0)
         if self.hidden_depth > 0:
-            self.hidden_layer = MLP(emb_dim, emb_dim, hidden_depth)
+            self.hidden_layer = MLP(emb_dim, emb_dim, hidden_depth, dropout=0.0)
         self.linear = torch.nn.Linear(emb_dim, out_dim)
 
         # initialize weights
@@ -328,7 +335,7 @@ class ContrastiveEncoder(BaseEstimator, TransformerMixin):
             y (Array): Binary targets for all samples in data
         """
         X_train, X_val, y_train, y_val = train_test_split(
-            X, y, test_size=0.01, random_state=42, stratify=y
+            X, y, test_size=0.1, random_state=42, stratify=y
         )
         self.data = X_train
         self.y = y_train
@@ -385,7 +392,9 @@ class ContrastiveEncoder(BaseEstimator, TransformerMixin):
 
         best_val_loss = float("inf")
         no_improvement_count = 0
-        patience = 5
+        PATIENCE = 5
+
+        # scaler = GradScaler()
 
         # Train contrastive learning encoder
         epochs_tqdm = (
@@ -394,8 +403,14 @@ class ContrastiveEncoder(BaseEstimator, TransformerMixin):
             else range(1, self.epochs + 1)
         )
         for epoch in epochs_tqdm:
+            start = time.time()
             self.model.train()
             train_loss = 0.0
+
+            # Best Practices
+            # We strongly recommend using mixed precision with torch.amp or the TF32 mode
+            # (on Ampere and later CUDA devices) whenever possible when training a network.
+
             for anchor, positive, negative, anchor_target in train_loader:
                 anchor, positive, negative, anchor_target = (
                     anchor.to(self.device),
@@ -408,6 +423,7 @@ class ContrastiveEncoder(BaseEstimator, TransformerMixin):
                 optimizer.zero_grad()
 
                 # get embeddings
+                # with torch.autocast(device_type="cuda", dtype=torch.float16):
                 emb_anchor, emb_positive, emb_negative, log_reg = self.model(
                     anchor, positive, negative
                 )
@@ -426,13 +442,19 @@ class ContrastiveEncoder(BaseEstimator, TransformerMixin):
                         for param in self.model.hidden_layer.parameters():
                             param.requires_grad = False
                     loss = ntxent_loss(
-                        emb_anchor, emb_positive, emb_negative, anchor_target, log_reg
+                        emb_anchor,
+                        emb_positive,
+                        emb_negative,
+                        anchor_target,
+                        log_reg,
                     )
+                # scaler.scale(loss).backward()
                 loss.backward()
 
                 # update model weights
+                # scaler.step(optimizer)
                 optimizer.step()
-
+                # scaler.update()
                 # log progress
                 train_loss += anchor.size(0) * loss.item()
 
@@ -450,6 +472,7 @@ class ContrastiveEncoder(BaseEstimator, TransformerMixin):
                         negative.to(self.device),
                         anchor_target.to(self.device),
                     )
+                    # with torch.autocast(device_type="cuda", dtype=torch.float16):
                     # get embeddings
                     emb_anchor, emb_positive, emb_negative, log_reg = self.model(
                         anchor, positive, negative
@@ -477,24 +500,26 @@ class ContrastiveEncoder(BaseEstimator, TransformerMixin):
                         )
                     val_loss += anchor.size(0) * loss_val.item()
 
-            if epoch % 10 == 0:
-                print(f"Epoch: {epoch}")
-
             avg_train_loss = train_loss / len(train_loader.dataset)
             train_loss_history.append(avg_train_loss)
 
             avg_val_loss = val_loss / len(val_loader.dataset)
             val_loss_history.append(avg_val_loss)
 
-            # if avg_val_loss < best_val_loss:
-            #     best_val_loss = avg_val_loss
-            #     no_improvement_count = 0
-            # else:
-            #     no_improvement_count += 1
+            end = time.time()
+            elapsed = end - start
+            print(
+                f"Epoch {epoch} took {elapsed:.2f}s - Train loss: {avg_train_loss} - Val loss: {avg_val_loss}"
+            )
+            if avg_val_loss < best_val_loss:
+                best_val_loss = avg_val_loss
+                no_improvement_count = 0
+            else:
+                no_improvement_count += 1
 
-            # if no_improvement_count >= patience and False:
-            #     print(f"Early stopping after {epoch+1} epochs without improvement.")
-            #     break
+            if no_improvement_count >= PATIENCE and False:
+                print(f"Early stopping after {epoch+1} epochs without improvement.")
+                break
 
         self.train_loss_history = train_loss_history
         self.val_loss_history = val_loss_history
@@ -599,7 +624,10 @@ def subset_marker_genes(adata_sc, adata_st):
     Returns:
         _type_: _description_
     """
-    adata_sc.layers["counts"] = adata_sc.X.copy()
+    # adata_sc.layers["counts"] = adata_sc.X.copy()
+    adata_sc_augmented = augment_data(
+        adata_sc, annotation=args.annotation, percentage=0.4
+    )
     # Calculate marker genes
     sc.pp.normalize_total(adata_sc, target_sum=1e4)
     sc.pp.log1p(adata_sc)
@@ -610,11 +638,11 @@ def subset_marker_genes(adata_sc, adata_st):
     markers = list(np.unique(markers_df.melt().value.values))
 
     markers_intersect = list(set(markers).intersection(adata_st.var.index))
-
-    adata_sc = adata_sc[:, markers_intersect]
+    # augmentation of SC data to make it similar to ST
+    adata_sc_augmented = adata_sc_augmented[:, markers_intersect]
     adata_st = adata_st[:, markers_intersect]
 
-    return adata_sc, adata_st, markers_intersect
+    return adata_sc_augmented, adata_st, markers_intersect
 
 
 def plot_loss_curve(ce, path):
@@ -668,7 +696,7 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "--to_predict",
-        help="Datasets to predict on",
+        help="Comma separated list of ST datasets to predict on using the trained model",
         type=str,
         required=False,
         default="",
@@ -691,7 +719,7 @@ if __name__ == "__main__":
     adata_sc, adata_st, markers_intersect = subset_marker_genes(adata_sc, adata_st)
     logger.info("Found intersecting marker genes, performed subset on ST and SC")
 
-    X = adata_sc.layers["counts"].toarray()
+    X = adata_sc.X.toarray()
     logger.info("Input ready...")
 
     y = adata_sc.obs[args.annotation]
@@ -700,18 +728,23 @@ if __name__ == "__main__":
     logger.info("Labels ready...")
 
     fix_seed(0)
+    EMB_DIM = 64
+    ENC_DEPTH = 5
+    HIDD_DEPTH = 3
     ce = ContrastiveEncoder(
         out_dim=len(le.classes_),
         epochs=args.epochs,
-        emb_dim=64,
-        encoder_depth=5,
-        hidden_depth=3,
+        emb_dim=EMB_DIM,
+        encoder_depth=ENC_DEPTH,
+        hidden_depth=HIDD_DEPTH,
     )
 
     X_train, X_test, y_train, y_test = train_test_split(
         X, y_le, test_size=0.1, random_state=42, stratify=y_le
     )
-
+    logger.info(
+        f"""Fitting a model with: \n - embedding dim: {EMB_DIM} \n - encoder depth: {ENC_DEPTH} \n - hidden depth: {HIDD_DEPTH} in {args.epochs} epochs"""
+    )
     ce.fit(X, y_le)
     logger.info("Finished training...")
     model_save_path = f"models/{X.shape[0]}_cells_{timestamp}.pt"
@@ -736,25 +769,23 @@ if __name__ == "__main__":
     logger.info(f"Accuracy: {acc}")
     logger.info(f"F1 macro score: {f1}")
     logger.info("----------------------------")
-    # files = """/goofys/projects/SSI/datasets/4K/Mouse_brain_SC_0.05.h5ad,/goofys/projects/SSI/datasets/4K/Mouse_brain_SC_0.1.h5ad,/goofys/projects/SSI/datasets/4K/Mouse_brain_SC_0.2.h5ad,/goofys/projects/SSI/datasets/4K/Mouse_brain_SC_0.3.h5ad,/goofys/projects/SSI/datasets/4K/Mouse_brain_SC_0.5.h5ad,/goofys/projects/SSI/datasets/4K/Mouse_brain_SC_0.7.h5ad,/goofys/projects/SSI/datasets/4K/Mouse_brain_SC_0.9.h5ad"""
-    # files = """/goofys/Samples/Stereo_seq/Mouse_brain/SS200000141TL_B5.h5ad"""
-    # files = files.split(",")
-    # for file in files:
-    #     ad = sc.read(file)
-    #     ad.var_names_make_unique()
-    #     ad = ad[:, markers_intersect]
-    #     if not scipy.sparse.issparse(ad.X):
-    #         ad.X = scipy.sparse.csr_matrix(ad.X)
-    #         # logger.info(f"Converted SC gene exp matrix of {file} to csr")
-    #     y_pred = ce.predict(ad.X.toarray())
-    #     y_true = ad.obs[args.annotation_st]
-    #     acc = accuracy_score(y_true, le.inverse_transform(y_pred))
-    #     f1 = f1_score(y_true, le.inverse_transform(y_pred), average="macro")
-    #     logger.info(f"Results for: {file}")
-    #     logger.info(f"Accuracy: {acc}")
-    #     logger.info(f"F1 macro score: {f1}")
-    #     logger.info("-------------------------")
-    #     ad.obs["contrastive"] = le.inverse_transform(y_pred)
-    #     fname = file.split(".")[-1]
-    #     ad.obs["contrastive"].to_csv(f"contrastive_res/{fname}.csv")
+    files = args.to_predict.split(",")
+    for file in files:
+        ad = sc.read(file)
+        ad.var_names_make_unique()
+        ad = ad[:, markers_intersect]
+        if not scipy.sparse.issparse(ad.X):
+            ad.X = scipy.sparse.csr_matrix(ad.X)
+            # logger.info(f"Converted SC gene exp matrix of {file} to csr")
+        y_pred = ce.predict(ad.X.toarray())
+        y_true = ad.obs[args.annotation_st]
+        acc = accuracy_score(y_true, le.inverse_transform(y_pred))
+        f1 = f1_score(y_true, le.inverse_transform(y_pred), average="macro")
+        logger.info(f"Results for: {file}")
+        logger.info(f"Accuracy: {acc}")
+        logger.info(f"F1 macro score: {f1}")
+        logger.info("-------------------------")
+        ad.obs["contrastive"] = le.inverse_transform(y_pred)
+        fname = file.split(".")[-1]
+        ad.obs["contrastive"].to_csv(f"contrastive_res/{fname}.csv")
     # implement saving
