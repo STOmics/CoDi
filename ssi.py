@@ -18,6 +18,7 @@ from scipy.sparse import issparse
 import seaborn as sns
 from tqdm import tqdm
 
+random.seed = 3
 
 logging.basicConfig(
     format="%(asctime)s %(name)-12s %(levelname)-8s %(message)s", level=logging.INFO
