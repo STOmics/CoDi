@@ -217,8 +217,8 @@ adata_st.obs['confidence'] = [x["confidence"] for x in assigned_types]
 
 # Write CSV and H5AD
 adata_st.obs.index.name = 'cell_id'
-adata_st.obs[["sc_type"]].to_csv(os.path.basename(args.st_path).replace(".h5ad", "_ssi.csv"))
-adata_st.write_h5ad(os.path.basename(args.st_path).replace(".h5ad", "_ssi.h5ad"))
+adata_st.obs[["sc_type"]].to_csv(os.path.basename(args.st_path).replace(".h5ad", f"_ssi_{args.distance}.csv"))
+adata_st.write_h5ad(os.path.basename(args.st_path).replace(".h5ad", f"_ssi_{args.distance}.h5ad"))
 
 # Visualisation
 def plot_spatial(
@@ -273,7 +273,7 @@ if "spatial" in adata_st.obsm_keys():
         ax=axs[1],
         title="Confidence map"
     )
-    plt.savefig(os.path.basename(args.st_path).replace(".h5ad", "_ssi.png"), dpi=120, bbox_inches="tight")
+    plt.savefig(os.path.basename(args.st_path).replace(".h5ad", f"_ssi_{args.distance}.png"), dpi=120, bbox_inches="tight")
 
 end = time.time()
 logger.info(f"Total execution time: {end - start}s")
