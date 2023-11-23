@@ -2,6 +2,7 @@ import os
 import subprocess
 import json
 import sys
+import time
 
 import scanpy as sc
 import pandas as pd
@@ -21,6 +22,7 @@ annotation = config["annotation"]
 command_gen = config["command"]
 algo_suffix = config["output_suffix"]
 
+start = time.time()
 # Read HQ data
 adata_sc = sc.read_h5ad(hq_path)
 adata_sc.var_names_make_unique()
@@ -54,3 +56,5 @@ for lq_path in lq_paths:
     out_df = pd.concat([out_df, res_df])
     print(out_df)
 out_df.to_csv(f"benchmark_{algo_suffix}.csv")
+end = time.time()
+print(f"benchmark.py took: {end-start}s")
