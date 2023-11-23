@@ -23,6 +23,7 @@ algo_suffix = config["output_suffix"]
 
 # Read HQ data
 adata_sc = sc.read_h5ad(hq_path)
+adata_sc.var_names_make_unique()
 
 def calc_metric(actual_labels, pred, ind):
     # Calculate the F-score per class (macro) since micro is the same as accuracy
@@ -47,6 +48,7 @@ for lq_path in lq_paths:
     if not os.path.exists(lq_path_pred):
         return_code = subprocess.call(command.split(" "))
     adata_st = sc.read_h5ad(lq_path_pred)
+    adata_st.var_names_make_unique()
     subsample_factor = lq_path_pred.split('_')[-2]
     res_df = calc_metric(adata_sc.obs[annotation], adata_st.obs["sc_type"], subsample_factor)
     out_df = pd.concat([out_df, res_df])

@@ -91,7 +91,6 @@ start_marker = time.time()
 if "rank_genes_groups" not in adata_sc.uns:
     sc.pp.normalize_total(adata_sc, target_sum=1e4)
     sc.pp.log1p(adata_sc)
-    adata_sc.var_names_make_unique()
     sc.pp.highly_variable_genes(adata_sc, inplace=True, n_top_genes=200)
     sc.tl.rank_genes_groups(adata_sc, groupby=args.annotation, use_raw=False)
 else:
