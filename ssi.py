@@ -48,7 +48,7 @@ parser.add_argument(
     type=str,
     required=False,
     default="KLD",
-    choices={"mahalanobis", "KLD", "wasserstein", "relative_entropy"},
+    choices={"mahalanobis", "KLD", "wasserstein", "relative_entropy", "hellinger"},
 )
 parser.add_argument(
     "--num_markers",
@@ -165,6 +165,13 @@ assigned_types = []
 
 iis = [ii for ii in range(len(st_df))]
 
+def hellinger(p,q):
+    """Hellinger distance between distributions"""
+    p= np.array(p)
+    q= np.array(q)
+    result = np.sum((np.sqrt(p) - np.sqrt(q))**2) / np.sqrt(2)
+    return result
+
 def per_cell(ii):
     best_matches_subsets = []
     for subset_id, subset in enumerate(subsets):
@@ -195,6 +202,11 @@ def per_cell(ii):
                 ).sum()
             elif args.distance == "wasserstein":
                 distance = wasserstein_distance(
+                    st_distrib,
+                    sc_distrib,
+                )
+            elif args.distance=='hellinger':
+                distance = hellinger(
                     st_distrib,
                     sc_distrib,
                 )
