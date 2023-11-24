@@ -13,6 +13,7 @@ import pandas as pd
 import scanpy as sc
 from scipy.spatial.distance import mahalanobis
 from scipy.stats import entropy
+from scipy.special import rel_entr, kl_div
 from scipy.stats import wasserstein_distance
 from scipy.sparse import issparse
 import seaborn as sns
@@ -47,7 +48,7 @@ parser.add_argument(
     type=str,
     required=False,
     default="KLD",
-    choices={"mahalanobis", "KLD", "wasserstein"},
+    choices={"mahalanobis", "KLD", "wasserstein", "relative_entropy"},
 )
 parser.add_argument(
     "--num_markers",
@@ -169,21 +170,33 @@ def per_cell(ii):
     for subset_id, subset in enumerate(subsets):
         best_match = {"cell_type": "", "dist": 9999999}
         for cell_type in cell_types:
+            st_distrib = st_df.iloc[ii, :][subset].values.astype(float)
+            sc_distrib = sc_mean[cell_type][subset_id].values.astype(float)
+            # normalize to sum 1.0 if sum is not 0
+            st_distrib = st_distrib / np.sum(st_distrib, axis=0, keepdims=True) \
+                if np.sum(st_distrib, axis=0, keepdims=True) != 0 else st_distrib
+            sc_distrib = sc_distrib / np.sum(sc_distrib, axis=0, keepdims=True) \
+                if np.sum(sc_distrib, axis=0, keepdims=True) != 0 else sc_distrib
             if args.distance == "mahalanobis":
                 distance = mahalanobis(
-                    st_df.iloc[ii, :][subset].values,
-                    sc_mean[cell_type][subset_id].values,
+                    st_distrib,
+                    sc_distrib,
                     sc_icms[cell_type][subset_id],
                 )
+            elif args.distance == "relative_entropy":
+                distance = rel_entr(
+                    st_distrib,
+                    sc_distrib,
+                ).sum()
             elif args.distance == "KLD":
-                distance = entropy(
-                    st_df.iloc[ii, :][subset].values,
-                    sc_mean[cell_type][subset_id].values,
-                )
+                distance = kl_div(
+                    st_distrib,
+                    sc_distrib,
+                ).sum()
             elif args.distance == "wasserstein":
                 distance = wasserstein_distance(
-                    st_df.iloc[ii, :][subset].values,
-                    sc_mean[cell_type][subset_id].values,
+                    st_distrib,
+                    sc_distrib,
                 )
 
             if distance < best_match["dist"]:
