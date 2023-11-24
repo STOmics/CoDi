@@ -48,7 +48,7 @@ parser.add_argument(
     type=str,
     required=False,
     default="KLD",
-    choices={"mahalanobis", "KLD", "wasserstein", "relative_entropy", "hellinger"},
+    choices={"mahalanobis", "KLD", "wasserstein", "relative_entropy", "hellinger", "binary"},
 )
 parser.add_argument(
     "--num_markers",
@@ -165,12 +165,18 @@ assigned_types = []
 
 iis = [ii for ii in range(len(st_df))]
 
-def hellinger(p,q):
+def hellinger(p, q):
     """Hellinger distance between distributions"""
     p= np.array(p)
     q= np.array(q)
     result = np.sum((np.sqrt(p) - np.sqrt(q))**2) / np.sqrt(2)
     return result
+
+def binary_distance(p, q):
+    '''Binary distance between distributions.
+    Sum all the positional pairs in both distributions which are
+    of different status: one zero, while other nonzero.'''
+    return np.sum(p.astype(bool) ^ q.astype(bool))
 
 def per_cell(ii):
     best_matches_subsets = []
@@ -180,33 +186,38 @@ def per_cell(ii):
             st_distrib = st_df.iloc[ii, :][subset].values.astype(float)
             sc_distrib = sc_mean[cell_type][subset_id].values.astype(float)
             # normalize to sum 1.0 if sum is not 0
-            st_distrib = st_distrib / np.sum(st_distrib, axis=0, keepdims=True) \
+            st_distrib_norm = st_distrib / np.sum(st_distrib, axis=0, keepdims=True) \
                 if np.sum(st_distrib, axis=0, keepdims=True) != 0 else st_distrib
-            sc_distrib = sc_distrib / np.sum(sc_distrib, axis=0, keepdims=True) \
+            sc_distrib_norm = sc_distrib / np.sum(sc_distrib, axis=0, keepdims=True) \
                 if np.sum(sc_distrib, axis=0, keepdims=True) != 0 else sc_distrib
             if args.distance == "mahalanobis":
                 distance = mahalanobis(
-                    st_distrib,
-                    sc_distrib,
+                    st_distrib_norm,
+                    sc_distrib_norm,
                     sc_icms[cell_type][subset_id],
                 )
             elif args.distance == "relative_entropy":
                 distance = rel_entr(
-                    st_distrib,
-                    sc_distrib,
+                    st_distrib_norm,
+                    sc_distrib_norm,
                 ).sum()
             elif args.distance == "KLD":
                 distance = kl_div(
-                    st_distrib,
-                    sc_distrib,
+                    st_distrib_norm,
+                    sc_distrib_norm,
                 ).sum()
             elif args.distance == "wasserstein":
                 distance = wasserstein_distance(
-                    st_distrib,
-                    sc_distrib,
+                    st_distrib_norm,
+                    sc_distrib_norm,
                 )
-            elif args.distance=='hellinger':
+            elif args.distance == 'hellinger':
                 distance = hellinger(
+                    st_distrib_norm,
+                    sc_distrib_norm,
+                )
+            elif args.distance == "binary":
+                distance = binary_distance(
                     st_distrib,
                     sc_distrib,
                 )
