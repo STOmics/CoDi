@@ -48,7 +48,7 @@ parser.add_argument(
     type=str,
     required=False,
     default="KLD",
-    choices={"mahalanobis", "KLD", "wasserstein", "relative_entropy", "hellinger", "binary"},
+    choices={"mahalanobis", "KLD", "wasserstein", "relativeEntropy", "hellinger", "binary"},
 )
 parser.add_argument(
     "--num_markers",
@@ -196,7 +196,7 @@ def per_cell(ii):
                     sc_distrib_norm,
                     sc_icms[cell_type][subset_id],
                 )
-            elif args.distance == "relative_entropy":
+            elif args.distance == "relativeEntropy":
                 distance = rel_entr(
                     st_distrib_norm,
                     sc_distrib_norm,
