@@ -70,10 +70,11 @@ if "markers_per_type_reduced_dict" not in adata_sc.uns:
     markers = list(np.unique(markers_df.melt().value.values))
     pval_df = pd.DataFrame(adata_sc.uns["rank_genes_groups"]["pvals_adj"])
     markers_per_type_dict = {}
+    # keep only the genes with pval < 0.05
     for col in markers_df.columns:
         markers_per_type_dict[col] = markers_df.loc[pval_df[col] < 0.05, col].values
 
-    # Marker gene count
+    # Marker gene count (number of cell types in which a gene is a marker gene)
     gene_marker_times = {gene: 0 for gene in adata_sc.var.index}
     for col in markers_df.columns:
         for gene in adata_sc.var.index:
@@ -81,11 +82,13 @@ if "markers_per_type_reduced_dict" not in adata_sc.uns:
                 gene_marker_times[gene] += 1
         print(f'Processed {col}')
 
+    # reduce marker gene lists by removing non-selective ones
+    specificity_thr = 0.25
     markers_per_type_reduced_dict = {}
     for col in markers_df.columns:
         reduced_gene_set = set()
         for gene in markers_per_type_dict[col]:
-            if gene_marker_times[gene] <= int(len(markers_df.columns) * 0.25):  # 5
+            if gene_marker_times[gene] <= int(len(markers_df.columns) * specificity_thr):  # 5
                 reduced_gene_set.add(gene)
         markers_per_type_reduced_dict[col] = reduced_gene_set.copy()
         print(col, len(markers_per_type_reduced_dict[col]))
@@ -122,9 +125,10 @@ st_cell_types_df = pd.read_csv(st_cell_type_path)
 st_cell_types_df.set_index(st_cell_types_df.columns[-2], inplace=True)
 st_annotation = st_cell_types_df.columns[-1]
 
-# Exclude cell types with less than 10 cells
+# Exclude cell types with less than <min_cells> cells
+min_cells = 5
 c = Counter(st_cell_types_df[st_cell_types_df.columns[-1]])
-exclude_types = {el for el in c.elements() if c[el] <= 5}
+exclude_types = {el for el in c.elements() if c[el] <= min_cells}
 st_cell_types_df.loc[:, st_cell_types_df.columns[-1]] = st_cell_types_df[st_cell_types_df.columns[-1]].apply(lambda x: x if x not in exclude_types else "FILTERED")
 
 # Add annotation from CSV to AnnData so we can calculate marker genes
@@ -159,11 +163,10 @@ report_df = pd.DataFrame(columns=["sc_marker_genes", "st_marker_genes", "st_cell
 for sc_dict_name, sc_dict in zip(["unique marker genes", "top 100 marker genes"],
                                  [markers_per_type_reduced_dict, markers_per_type_top]):
 
-    # Remove genes that does not exist in ST
+    # Remove genes that do not exist in ST
     for ctype, genes in sc_dict.items():
         st_genes = list(adata_st.var.index)
-        sc_dict[ctype] = \
-        list(filter(lambda x: x in st_genes, sc_dict[ctype]))
+        sc_dict[ctype] = list(filter(lambda x: x in st_genes, sc_dict[ctype]))
 
     markers_per_type_st_dict = dict()
     for col in set(markers_st_df.columns).intersection(set(sc_dict.keys())):
