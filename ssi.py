@@ -218,8 +218,8 @@ def per_cell(ii):
                 )
             elif args.distance == "binary":
                 distance = binary_distance(
-                    st_distrib,
-                    sc_distrib,
+                    np.floor(st_distrib),
+                    np.floor(sc_distrib),
                 )
 
             if distance < best_match["dist"]:
