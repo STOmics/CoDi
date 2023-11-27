@@ -13,11 +13,13 @@ import pandas as pd
 import scanpy as sc
 from scipy.spatial.distance import mahalanobis
 from scipy.stats import entropy
+from scipy.special import rel_entr, kl_div
 from scipy.stats import wasserstein_distance
 from scipy.sparse import issparse
 import seaborn as sns
 from tqdm import tqdm
 
+random.seed = 3
 
 logging.basicConfig(
     format="%(asctime)s %(name)-12s %(levelname)-8s %(message)s", level=logging.INFO
@@ -46,7 +48,7 @@ parser.add_argument(
     type=str,
     required=False,
     default="KLD",
-    choices={"mahalanobis", "KLD", "wasserstein"},
+    choices={"mahalanobis", "KLD", "wasserstein", "relativeEntropy", "hellinger", "binary"},
 )
 parser.add_argument(
     "--num_markers",
@@ -91,7 +93,6 @@ start_marker = time.time()
 if "rank_genes_groups" not in adata_sc.uns:
     sc.pp.normalize_total(adata_sc, target_sum=1e4)
     sc.pp.log1p(adata_sc)
-    adata_sc.var_names_make_unique()
     sc.pp.highly_variable_genes(adata_sc, inplace=True, n_top_genes=200)
     sc.tl.rank_genes_groups(adata_sc, groupby=args.annotation, use_raw=False)
 else:
@@ -164,26 +165,61 @@ assigned_types = []
 
 iis = [ii for ii in range(len(st_df))]
 
+def hellinger(p, q):
+    """Hellinger distance between distributions"""
+    p= np.array(p)
+    q= np.array(q)
+    result = np.sum((np.sqrt(p) - np.sqrt(q))**2) / np.sqrt(2)
+    return result
+
+def binary_distance(p, q):
+    '''Binary distance between distributions.
+    Sum all the positional pairs in both distributions which are
+    of different status: one zero, while other nonzero.'''
+    return np.sum(p.astype(bool) ^ q.astype(bool))
+
 def per_cell(ii):
     best_matches_subsets = []
     for subset_id, subset in enumerate(subsets):
         best_match = {"cell_type": "", "dist": 9999999}
         for cell_type in cell_types:
+            st_distrib = st_df.iloc[ii, :][subset].values.astype(float)
+            sc_distrib = sc_mean[cell_type][subset_id].values.astype(float)
+            # normalize to sum 1.0 if sum is not 0
+            st_distrib_norm = st_distrib / np.sum(st_distrib, axis=0, keepdims=True) \
+                if np.sum(st_distrib, axis=0, keepdims=True) != 0 else st_distrib
+            sc_distrib_norm = sc_distrib / np.sum(sc_distrib, axis=0, keepdims=True) \
+                if np.sum(sc_distrib, axis=0, keepdims=True) != 0 else sc_distrib
             if args.distance == "mahalanobis":
                 distance = mahalanobis(
-                    st_df.iloc[ii, :][subset].values,
-                    sc_mean[cell_type][subset_id].values,
+                    st_distrib_norm,
+                    sc_distrib_norm,
                     sc_icms[cell_type][subset_id],
                 )
+            elif args.distance == "relativeEntropy":
+                distance = rel_entr(
+                    st_distrib_norm,
+                    sc_distrib_norm,
+                ).sum()
             elif args.distance == "KLD":
-                distance = entropy(
-                    st_df.iloc[ii, :][subset].values,
-                    sc_mean[cell_type][subset_id].values,
-                )
+                distance = kl_div(
+                    st_distrib_norm,
+                    sc_distrib_norm,
+                ).sum()
             elif args.distance == "wasserstein":
                 distance = wasserstein_distance(
-                    st_df.iloc[ii, :][subset].values,
-                    sc_mean[cell_type][subset_id].values,
+                    st_distrib_norm,
+                    sc_distrib_norm,
+                )
+            elif args.distance == 'hellinger':
+                distance = hellinger(
+                    st_distrib_norm,
+                    sc_distrib_norm,
+                )
+            elif args.distance == "binary":
+                distance = binary_distance(
+                    np.floor(st_distrib),
+                    np.floor(sc_distrib),
                 )
 
             if distance < best_match["dist"]:
@@ -210,15 +246,15 @@ assigned_types.sort(key=lambda x: x[0])
 assigned_types = [at[1] for at in assigned_types]
 end = time.time()
 logger.info(f"SSI execution took: {end - start}s")
-adata_st.obs["sc_type"] = [x["cell_type"] for x in assigned_types]
+adata_st.obs["ssi"] = [x["cell_type"] for x in assigned_types]
 adata_st.obs['confidence'] = [x["confidence"] for x in assigned_types]
 # sns.histplot([x["confidence"] for x in assigned_types])
 # plt.savefig(f"ssi_confidence_hist__{args.distance}.png", dpi=120, bbox_inches="tight")
 
 # Write CSV and H5AD
 adata_st.obs.index.name = 'cell_id'
-adata_st.obs[["sc_type"]].to_csv(os.path.basename(args.st_path).replace(".h5ad", "_ssi.csv"))
-adata_st.write_h5ad(os.path.basename(args.st_path).replace(".h5ad", "_ssi.h5ad"))
+adata_st.obs[["ssi"]].to_csv(os.path.basename(args.st_path).replace(".h5ad", f"_ssi_{args.distance}.csv"))
+adata_st.write_h5ad(os.path.basename(args.st_path).replace(".h5ad", f"_ssi_{args.distance}.h5ad"))
 
 # Visualisation
 def plot_spatial(
@@ -261,7 +297,7 @@ if "spatial" in adata_st.obsm_keys():
     fig, axs = plt.subplots(1, 2, figsize=(14, 14))
     plot_spatial(
         adata_st,
-        annotation=f"sc_type",
+        annotation=f"ssi",
         spot_size=50,
         ax=axs[0],
         title="Cell types"
@@ -273,7 +309,7 @@ if "spatial" in adata_st.obsm_keys():
         ax=axs[1],
         title="Confidence map"
     )
-    plt.savefig(os.path.basename(args.st_path).replace(".h5ad", "_ssi.png"), dpi=120, bbox_inches="tight")
+    plt.savefig(os.path.basename(args.st_path).replace(".h5ad", f"_ssi_{args.distance}.png"), dpi=120, bbox_inches="tight")
 
 end = time.time()
 logger.info(f"Total execution time: {end - start}s")

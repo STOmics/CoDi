@@ -40,6 +40,10 @@ if __name__ == '__main__':
         adata_st.obsm['spatial'] = np.array(adata_st.obsm['spatial_stereoseq'].copy())
     elif 'spatial' in adata_st.obsm:
         pass
+    elif os.path.splitext(args.sc_path)[0] in args.st_path:
+        # allow no spatial information for SC synthetic data
+        # set plotting to 0
+        args.plotting = 0
     else:
         raise ValueError('Spatial coordinates not found. Labels expected in: \
             .obsm["spatial"] or\n \
@@ -67,7 +71,7 @@ if __name__ == '__main__':
         # mode="cells",
         mode="clusters",
         cluster_label='cell_subclass',  # .obs field w cell types
-        density_prior='rna_count_based',
+        density_prior='uniform',
         num_epochs=500,
         # device="cuda:0",
         device='cpu',
@@ -81,7 +85,10 @@ if __name__ == '__main__':
         adata_st.obs.loc[cell_name, 'tangram'] = ad_map.obs['cell_subclass'].values[index_of_max]
 
     # save the .h5ad file with tangram annotation
-    adata_st.write_h5ad(f'{os.path.splitext(os.path.split(args.st_path)[1])[0]}_tangram.h5ad')
+    # Write CSV and H5AD
+    adata_st.obs.index.name = 'cell_id'
+    adata_st.obs[["tangram"]].to_csv(os.path.basename(args.st_path).replace(".h5ad", "_tangram.csv"))
+    adata_st.write_h5ad(os.path.basename(args.st_path).replace(".h5ad", "_tangram.h5ad"))
 
     # plot the mapping results compared to ST annotation
     if args.plotting > 0:
