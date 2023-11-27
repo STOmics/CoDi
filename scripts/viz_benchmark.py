@@ -5,9 +5,12 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 
 
-files = glob.glob('../test/' + 'benchmark_ssi_*.csv')
+files = glob.glob('../test/' + 'benchmark_*.csv')
 dfs = {}
 for f in files:
+    # if 'ssi' in f:
+    #     if not 'KLD' in f:
+    #         continue
     name = f.split('_')[-1].replace('.csv', '')
     dfs[name] = pd.read_csv(f)
     sns.scatterplot(data=dfs[name], x='Subsample', y='Accuracy')

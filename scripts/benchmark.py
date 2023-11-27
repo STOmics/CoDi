@@ -55,20 +55,28 @@ for lq_path in lq_paths:
     
     command = command_gen.replace("hq_path", hq_path).replace("lq_path", lq_path).replace("annotation", annotation)
     command_split = command.split(" ")
-    if '-d' in command_split:
-        distance_metric = command_split[[h for h, value in enumerate(command_split) if value == '-d'][0]+1]
+    if algo_suffix == "ssi":
+        if '-d' in command_split:
+            distance_metric = command_split[[h for h, value in enumerate(command_split) if value == '-d'][0]+1]
+        else:
+            distance_metric = "KLD"
+        lq_path_pred = os.path.basename(lq_path).replace(".h5ad", f"_{algo_suffix}_{distance_metric}.h5ad")
+        subsample_factor_pos = -3
+        out_file_name = f"../test/benchmark_{algo_suffix}_{distance_metric}.csv"
     else:
-        distance_metric = "KLD"
-    lq_path_pred = os.path.basename(lq_path).replace(".h5ad", f"_{algo_suffix}_{distance_metric}.h5ad")
+        lq_path_pred = os.path.basename(lq_path).replace(".h5ad", f"_{algo_suffix}.h5ad")
+        subsample_factor_pos = -2
+        out_file_name = f"../test/benchmark_{algo_suffix}.csv"
     if not os.path.exists(lq_path_pred):
         return_code = subprocess.call(command.split(" "))
     adata_st = sc.read_h5ad(lq_path_pred)
     adata_st.var_names_make_unique()
-    subsample_factor = lq_path_pred.split('_')[-3] if is_number(lq_path_pred.split('_')[-3]) else 0.0
-    res_df = calc_metric(adata_sc.obs[annotation], adata_st.obs["sc_type"], subsample_factor)
+    subsample_factor = lq_path_pred.split('_')[subsample_factor_pos] \
+        if is_number(lq_path_pred.split('_')[subsample_factor_pos]) else 0.0
+    res_df = calc_metric(adata_sc.obs[annotation], adata_st.obs[algo_suffix], subsample_factor)
     out_df = pd.concat([out_df, res_df])
     print(out_df)
 out_df = out_df.reset_index(drop=True)
-out_df.to_csv(f"../test/benchmark_{algo_suffix}_{distance_metric}.csv")
+out_df.to_csv(out_file_name)
 end = time.time()
 print(f"benchmark.py took: {end-start}s")

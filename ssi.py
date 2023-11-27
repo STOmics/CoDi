@@ -246,14 +246,14 @@ assigned_types.sort(key=lambda x: x[0])
 assigned_types = [at[1] for at in assigned_types]
 end = time.time()
 logger.info(f"SSI execution took: {end - start}s")
-adata_st.obs["sc_type"] = [x["cell_type"] for x in assigned_types]
+adata_st.obs["ssi"] = [x["cell_type"] for x in assigned_types]
 adata_st.obs['confidence'] = [x["confidence"] for x in assigned_types]
 # sns.histplot([x["confidence"] for x in assigned_types])
 # plt.savefig(f"ssi_confidence_hist__{args.distance}.png", dpi=120, bbox_inches="tight")
 
 # Write CSV and H5AD
 adata_st.obs.index.name = 'cell_id'
-adata_st.obs[["sc_type"]].to_csv(os.path.basename(args.st_path).replace(".h5ad", f"_ssi_{args.distance}.csv"))
+adata_st.obs[["ssi"]].to_csv(os.path.basename(args.st_path).replace(".h5ad", f"_ssi_{args.distance}.csv"))
 adata_st.write_h5ad(os.path.basename(args.st_path).replace(".h5ad", f"_ssi_{args.distance}.h5ad"))
 
 # Visualisation
@@ -297,7 +297,7 @@ if "spatial" in adata_st.obsm_keys():
     fig, axs = plt.subplots(1, 2, figsize=(14, 14))
     plot_spatial(
         adata_st,
-        annotation=f"sc_type",
+        annotation=f"ssi",
         spot_size=50,
         ax=axs[0],
         title="Cell types"
