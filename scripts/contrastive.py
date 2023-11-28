@@ -285,8 +285,8 @@ class ContrastiveEncoder(BaseEstimator, TransformerMixin):
         emb_dim=16,
         encoder_depth=4,
         hidden_depth=2,
-        contrastive_only_perc=0.5,
-        contrastive_weight=0.9,
+        contrastive_only_perc=0.3,
+        contrastive_weight=0.8,
         freeze_encoder=True,
         out_dim=1,
         freeze_hidden=True,
@@ -439,7 +439,7 @@ class ContrastiveEncoder(BaseEstimator, TransformerMixin):
                 )
 
                 # compute loss
-                if epoch <= self.contrastive_only_perc * self.epochs:  # <= change!!
+                if epoch <= self.contrastive_only_perc * self.epochs:
                     # consider only contrastive loss until encoder trains enough
                     # freeze classifier weights for training only on contrastive loss
                     if self.freeze_hidden and self.hidden_depth > 0:
@@ -539,17 +539,21 @@ class ContrastiveEncoder(BaseEstimator, TransformerMixin):
             print(f"Epoch {epoch} took {elapsed:.2f}s")
 
             avg_val_loss = avg_val_loss_contrastive + avg_val_loss_classification
-            if avg_val_loss < best_val_loss:
-                best_val_loss = avg_val_loss
-                no_improvement_count = 0
-            else:
-                no_improvement_count += 1
+            is_classification_loss_included = (
+                epoch > self.contrastive_only_perc * self.epochs
+            )
+            if is_classification_loss_included:
+                if avg_val_loss < best_val_loss:
+                    best_val_loss = avg_val_loss
+                    no_improvement_count = 0
+                else:
+                    no_improvement_count += 1
 
-            if no_improvement_count >= PATIENCE:
-                logger.info(
-                    f"Early stopping after {epoch+1} epochs without improvement."
-                )
-                break
+                if no_improvement_count >= PATIENCE:
+                    logger.info(
+                        f"Early stopping after {epoch+1} epochs without improvement."
+                    )
+                    break
 
         self.train_loss_history_contrastive = train_loss_history_contrastive
         self.train_loss_history_classification = train_loss_history_classification
@@ -695,17 +699,17 @@ def subset_marker_genes(adata_sc, adata_st):
 
 def plot_loss_curve(ce, path):
     fig, axs = plt.subplots(2)
-    axs[0].plot(ce.train_loss_history_contrastive, label="Training loss contr")
-    axs[0].plot(ce.val_loss_history_contrastive, label="Validation loss contr")
-    axs[1].plot(ce.train_loss_history_classification, label="Training loss class")
-    axs[1].plot(ce.val_loss_history_classification, label="Validation loss class")
+    axs[0].plot(ce.train_loss_history_contrastive, label="Training")
+    axs[0].plot(ce.val_loss_history_contrastive, label="Validation")
+    axs[1].plot(ce.train_loss_history_classification, label="Training")
+    axs[1].plot(ce.val_loss_history_classification, label="Validation")
 
+    plt.title("Model loss")
     axs[0].legend(loc="upper left")
     axs[1].legend(loc="upper left")
-    plt.title("Model loss")
-    axs[0].set_ylabel("loss")
+    axs[0].set_ylabel("contrastive loss")
     axs[0].set_xlabel("epoch")
-    axs[1].set_ylabel("loss")
+    axs[1].set_ylabel("classification loss")
     axs[1].set_xlabel("epoch")
     plt.tight_layout()
     plt.savefig(path)
@@ -790,7 +794,7 @@ if __name__ == "__main__":
 
     fix_seed(0)
     EMB_DIM = 128
-    ENC_DEPTH = 4
+    ENC_DEPTH = 3
     HIDD_DEPTH = 2
     ce = ContrastiveEncoder(
         out_dim=len(le.classes_),
