@@ -391,7 +391,13 @@ class ContrastiveEncoder(BaseEstimator, TransformerMixin):
             encoder_depth=self.encoder_depth,
             hidden_depth=self.hidden_depth,
         ).to(self.device)
-        optimizer = Adam(self.model.parameters(), lr=0.001)
+
+        params = [
+            {"params": self.model.encoder.parameters(), "lr": 0.001},
+            {"params": self.model.classifier.parameters(), "lr": 0.007},
+        ]
+
+        optimizer = Adam(params)
         combined_loss = CombinedLoss(class_weights=self.class_weights).to(self.device)
 
         train_loss_history_contrastive = []
@@ -793,8 +799,8 @@ if __name__ == "__main__":
     logger.info("Labels ready...")
 
     fix_seed(0)
-    EMB_DIM = 128
-    ENC_DEPTH = 3
+    EMB_DIM = 64
+    ENC_DEPTH = 4
     HIDD_DEPTH = 2
     ce = ContrastiveEncoder(
         out_dim=len(le.classes_),
