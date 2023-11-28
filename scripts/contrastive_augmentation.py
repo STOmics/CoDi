@@ -81,7 +81,7 @@ def augment_data(adata_sc: ad.AnnData, annotation: str, percentage: float):
             for obs_name in random.choices(adata_single_ct.obs_names, k=new_size):
                 # mutate here
                 new_adata.obs[annotation].iloc[ind] = label
-                to_mutate = adata_sc[obs_name].X.toarray().astype(np.int16)
+                to_mutate = adata_sc[obs_name].X.toarray().astype(np.int16)[0]
                 non_zero_indices = np.nonzero(to_mutate)
                 num_elements_to_zero = int(percentage * len(non_zero_indices[0]))
                 selected_indices = random.sample(

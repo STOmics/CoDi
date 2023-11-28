@@ -20,6 +20,7 @@ from sklearn.model_selection import train_test_split
 import torch
 import torch.nn as nn
 from torch.nn.functional import cosine_similarity
+import torch.nn.functional as F
 from torch.utils.data import Dataset
 from torch.cuda.amp import GradScaler
 from torch.optim import Adam
@@ -53,7 +54,7 @@ logger = logging.getLogger(__name__)
 
 
 class CombinedLoss(nn.Module):
-    def __init__(self, temperature=0.7, contrastive_weight=0.75, class_weights=None):
+    def __init__(self, temperature=1, contrastive_weight=0.75, class_weights=None):
         """Loss for contrastive learning using cosine distance as similarity metric.
 
         Args:
@@ -78,8 +79,8 @@ class CombinedLoss(nn.Module):
         batch_size = z_i.size(0)
 
         # First, one needs to apply an L2 normalization to the features
-        # z_i = F.normalize(proj_1, p=2, dim=1)
-        # z_j = F.normalize(proj_2, p=2, dim=1)
+        z_i = F.normalize(z_i, p=2, dim=1)
+        z_j = F.normalize(z_j, p=2, dim=1)
 
         # compute similarity between the sample's embeddings
         z = torch.cat([z_i, z_j], dim=0)
@@ -119,7 +120,11 @@ class CombinedLoss(nn.Module):
         log_reg_loss = contrastive_loss * self.contrastive_weight + log_loss * (
             1 - self.contrastive_weight
         )
-        return log_reg_loss
+        # return a tuple representing both contrastive and classification loss
+        return (
+            contrastive_loss * self.contrastive_weight,
+            log_loss * (1 - self.contrastive_weight),
+        )
 
 
 class MLP(torch.nn.Sequential):
@@ -157,15 +162,15 @@ class DeepEncoder(nn.Module):
         """
         super().__init__()
         self.hidden_depth = hidden_depth
-        self.encoder = MLP(input_dim, emb_dim, encoder_depth, dropout=0.0)
+        self.encoder = MLP(input_dim, emb_dim, encoder_depth, dropout=0.2)
         if self.hidden_depth > 0:
-            self.hidden_layer = MLP(emb_dim, emb_dim, hidden_depth, dropout=0.0)
+            self.classifier = MLP(emb_dim, emb_dim, hidden_depth, dropout=0.2)
         self.linear = torch.nn.Linear(emb_dim, out_dim)
 
         # initialize weights
         self.encoder.apply(self._init_weights)
         if self.hidden_depth > 0:
-            self.hidden_layer.apply(self._init_weights)
+            self.classifier.apply(self._init_weights)
         self.linear.apply(self._init_weights)
 
     def _init_weights(self, module):
@@ -180,11 +185,11 @@ class DeepEncoder(nn.Module):
         # compute embeddings
         emb_anchor = self.encoder(anchor)
         if self.hidden_depth > 0:
-            emb_anchor = self.hidden_layer(emb_anchor)
+            emb_anchor = self.classifier(emb_anchor)
 
         emb_positive = self.encoder(positive)
         if self.hidden_depth > 0:
-            emb_positive = self.hidden_layer(emb_positive)
+            emb_positive = self.classifier(emb_positive)
 
         emb_negative = (
             [self.encoder(neg_sample) for neg_sample in negative]
@@ -193,9 +198,9 @@ class DeepEncoder(nn.Module):
         )
         if self.hidden_depth > 0:
             emb_negative = (
-                [self.hidden_layer(emb_neg) for emb_neg in emb_negative]
+                [self.classifier(emb_neg) for emb_neg in emb_negative]
                 if random_neg.dim() == 3
-                else self.hidden_layer(emb_negative)
+                else self.classifier(emb_negative)
             )
 
         log_pred = self.linear(emb_anchor)
@@ -205,7 +210,7 @@ class DeepEncoder(nn.Module):
     def get_embeddings(self, input_data):
         emb_anchor = self.encoder(input_data)
         if self.hidden_depth > 0:
-            emb_anchor = self.hidden_layer(emb_anchor)
+            emb_anchor = self.classifier(emb_anchor)
         return emb_anchor
 
     def get_log_reg(self, input_data):
@@ -249,10 +254,10 @@ class ContrastiveDataset(Dataset):
         opposite_group = self.target_to_opposite[anchor_target]
 
         if self.num_of_negatives > 0:
-            random_oposite_idx = random.sample(opposite_group, k=self.num_of_negatives)
+            random_oposite_idxs = random.sample(opposite_group, k=self.num_of_negatives)
             # random_oposite_idx = [opposite_group[x] for x in oposite_group_indices]
             random_oposite_samples = torch.tensor(
-                self.data[random_oposite_idx], dtype=torch.float
+                self.data[random_oposite_idxs], dtype=torch.float
             )
         else:
             # Send anchor sample: Will be ignored by calculating always zero loss
@@ -275,16 +280,16 @@ class ContrastiveEncoder(BaseEstimator, TransformerMixin):
     def __init__(
         self,
         num_of_negatives=2,
-        batch_size=1024,
+        batch_size=512,
         epochs=50,
         emb_dim=16,
         encoder_depth=4,
         hidden_depth=2,
-        contrastive_only_perc=0.2,
-        contrastive_weight=0.25,
+        contrastive_only_perc=0.5,
+        contrastive_weight=0.9,
         freeze_encoder=True,
         out_dim=1,
-        freeze_hidden=False,
+        freeze_hidden=True,
         verbose=0,
         class_weights=None,
     ):
@@ -323,8 +328,10 @@ class ContrastiveEncoder(BaseEstimator, TransformerMixin):
         self.class_weights = class_weights
         self.model = None
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        self.train_loss_history = []
-        self.val_loss_history = []
+        self.train_loss_history_contrastive = []
+        self.train_loss_history_classification = []
+        self.val_loss_history_contrastive = []
+        self.val_loss_history_classification = []
 
     def fit(self, X: np.ndarray, y: Optional[np.ndarray] = None):
         """Instantiate and train DeepEncoder that will try to minimize the loss between anchor and positive view
@@ -362,7 +369,7 @@ class ContrastiveEncoder(BaseEstimator, TransformerMixin):
             self.contr_ds,
             batch_size=self.batch_size,
             pin_memory=True,
-            num_workers=8,
+            num_workers=4,
             persistent_workers=True,
             prefetch_factor=3,
             shuffle=True,
@@ -385,10 +392,12 @@ class ContrastiveEncoder(BaseEstimator, TransformerMixin):
             hidden_depth=self.hidden_depth,
         ).to(self.device)
         optimizer = Adam(self.model.parameters(), lr=0.001)
-        ntxent_loss = CombinedLoss(class_weights=self.class_weights).to(self.device)
+        combined_loss = CombinedLoss(class_weights=self.class_weights).to(self.device)
 
-        train_loss_history = []
-        val_loss_history = []
+        train_loss_history_contrastive = []
+        train_loss_history_classification = []
+        val_loss_history_contrastive = []
+        val_loss_history_classification = []
 
         best_val_loss = float("inf")
         no_improvement_count = 0
@@ -405,7 +414,8 @@ class ContrastiveEncoder(BaseEstimator, TransformerMixin):
         for epoch in epochs_tqdm:
             start = time.time()
             self.model.train()
-            train_loss = 0.0
+            train_loss_contrastive = 0.0
+            train_loss_classification = 0.0
 
             # Best Practices
             # We strongly recommend using mixed precision with torch.amp or the TF32 mode
@@ -431,17 +441,24 @@ class ContrastiveEncoder(BaseEstimator, TransformerMixin):
                 # compute loss
                 if epoch <= self.contrastive_only_perc * self.epochs:  # <= change!!
                     # consider only contrastive loss until encoder trains enough
-                    loss = ntxent_loss(emb_anchor, emb_positive, emb_negative)
+                    # freeze classifier weights for training only on contrastive loss
+                    if self.freeze_hidden and self.hidden_depth > 0:
+                        for param in self.model.classifier.parameters():
+                            param.requires_grad = False
+                    loss_contrastive, loss_classification = combined_loss(
+                        emb_anchor, emb_positive, emb_negative
+                    )
                 else:
                     #  Take logistic reg loss into account
-                    if self.freeze_encoder:
-                        # First, freeze weights of contrastive encoder!
-                        for param in self.model.encoder.parameters():
-                            param.requires_grad = False
+                    # if self.freeze_encoder:
+                    #     # First, freeze weights of contrastive encoder!
+                    #     for param in self.model.encoder.parameters():
+                    #         param.requires_grad = False
+                    # unfreeze weights of the classifier to use combined loss
                     if self.freeze_hidden and self.hidden_depth > 0:
-                        for param in self.model.hidden_layer.parameters():
-                            param.requires_grad = False
-                    loss = ntxent_loss(
+                        for param in self.model.classifier.parameters():
+                            param.requires_grad = True
+                    loss_contrastive, loss_classification = combined_loss(
                         emb_anchor,
                         emb_positive,
                         emb_negative,
@@ -449,6 +466,7 @@ class ContrastiveEncoder(BaseEstimator, TransformerMixin):
                         log_reg,
                     )
                 # scaler.scale(loss).backward()
+                loss = loss_contrastive + loss_classification
                 loss.backward()
 
                 # update model weights
@@ -456,14 +474,16 @@ class ContrastiveEncoder(BaseEstimator, TransformerMixin):
                 optimizer.step()
                 # scaler.update()
                 # log progress
-                train_loss += anchor.size(0) * loss.item()
+                train_loss_contrastive += anchor.size(0) * loss_contrastive.item()
+                train_loss_classification += anchor.size(0) * loss_classification.item()
 
                 if self.verbose > 0:
                     epochs_tqdm.set_postfix({"loss": loss.item()})
 
             # validation
             self.model.eval()
-            val_loss = 0.0
+            val_loss_contrastive = 0.0
+            val_loss_classification = 0.0
             with torch.no_grad():
                 for anchor, positive, negative, anchor_target in val_loader:
                     anchor, positive, negative, anchor_target = (
@@ -481,51 +501,63 @@ class ContrastiveEncoder(BaseEstimator, TransformerMixin):
                     # compute loss
                     if epoch <= self.contrastive_only_perc * self.epochs:
                         # consider only contrastive loss until encoder trains enough
-                        loss_val = ntxent_loss(emb_anchor, emb_positive, emb_negative)
+                        contrastive_loss, classification_loss = combined_loss(
+                            emb_anchor, emb_positive, emb_negative
+                        )
                     else:
                         #  Take logistic reg loss into account
-                        if self.freeze_encoder:
-                            # First, freeze weights of contrastive encoder!
-                            for param in self.model.encoder.parameters():
-                                param.requires_grad = False
-                        if self.freeze_hidden and self.hidden_depth > 0:
-                            for param in self.model.hidden_layer.parameters():
-                                param.requires_grad = False
-                        loss_val = ntxent_loss(
+                        contrastive_loss, classification_loss = combined_loss(
                             emb_anchor,
                             emb_positive,
                             emb_negative,
                             anchor_target,
                             log_reg,
                         )
-                    val_loss += anchor.size(0) * loss_val.item()
+                    val_loss_contrastive += anchor.size(0) * contrastive_loss.item()
+                    val_loss_classification += (
+                        anchor.size(0) * classification_loss.item()
+                    )
 
-            avg_train_loss = train_loss / len(train_loader.dataset)
-            train_loss_history.append(avg_train_loss)
+            avg_train_loss_contrastive = train_loss_contrastive / len(
+                train_loader.dataset
+            )
+            avg_train_loss_classification = train_loss_classification / len(
+                train_loader.dataset
+            )
+            train_loss_history_contrastive.append(avg_train_loss_contrastive)
+            train_loss_history_classification.append(avg_train_loss_classification)
 
-            avg_val_loss = val_loss / len(val_loader.dataset)
-            val_loss_history.append(avg_val_loss)
+            avg_val_loss_contrastive = val_loss_contrastive / len(val_loader.dataset)
+            avg_val_loss_classification = val_loss_classification / len(
+                val_loader.dataset
+            )
+            val_loss_history_contrastive.append(avg_val_loss_contrastive)
+            val_loss_history_classification.append(avg_val_loss_classification)
 
             end = time.time()
             elapsed = end - start
-            print(
-                f"Epoch {epoch} took {elapsed:.2f}s - Train loss: {avg_train_loss} - Val loss: {avg_val_loss}"
-            )
+            print(f"Epoch {epoch} took {elapsed:.2f}s")
+
+            avg_val_loss = avg_val_loss_contrastive + avg_val_loss_classification
             if avg_val_loss < best_val_loss:
                 best_val_loss = avg_val_loss
                 no_improvement_count = 0
             else:
                 no_improvement_count += 1
 
-            if no_improvement_count >= PATIENCE and False:
-                print(f"Early stopping after {epoch+1} epochs without improvement.")
+            if no_improvement_count >= PATIENCE:
+                logger.info(
+                    f"Early stopping after {epoch+1} epochs without improvement."
+                )
                 break
 
-        self.train_loss_history = train_loss_history
-        self.val_loss_history = val_loss_history
+        self.train_loss_history_contrastive = train_loss_history_contrastive
+        self.train_loss_history_classification = train_loss_history_classification
+        self.val_loss_history_contrastive = val_loss_history_contrastive
+        self.val_loss_history_classification = val_loss_history_classification
         return self
 
-    def load_model(path: str):
+    def load_model(self, path: str):
         """Creates DeepEncoder and loads it from path
 
         Args:
@@ -624,10 +656,10 @@ def subset_marker_genes(adata_sc, adata_st):
     Returns:
         _type_: _description_
     """
-    # adata_sc.layers["counts"] = adata_sc.X.copy()
-    adata_sc_augmented = augment_data(
-        adata_sc, annotation=args.annotation, percentage=0.4
-    )
+    adata_sc.layers["counts"] = adata_sc.X.copy()
+    # adata_sc_augmented = augment_data(
+    #     adata_sc, annotation=args.annotation, percentage=0.4
+    # )
     # Calculate marker genes
     sc.pp.normalize_total(adata_sc, target_sum=1e4)
     sc.pp.log1p(adata_sc)
@@ -638,22 +670,46 @@ def subset_marker_genes(adata_sc, adata_st):
     markers = list(np.unique(markers_df.melt().value.values))
 
     markers_intersect = list(set(markers).intersection(adata_st.var.index))
+    logger.info(
+        "Found intersecting marker genes, performed intersection on ST and SC data"
+    )
     # augmentation of SC data to make it similar to ST
-    adata_sc_augmented = adata_sc_augmented[:, markers_intersect]
+    adata_sc.X = adata_sc.layers["counts"]
     adata_st = adata_st[:, markers_intersect]
+    adata_sc = adata_sc[:, markers_intersect]
+
+    adata_sc_augmented = augment_data(
+        adata_sc, annotation=args.annotation, percentage=0.4
+    )
+    logger.info(
+        f"Augmentation and rebalancing created new anndata object of shape: {adata_sc_augmented.shape} compared to old shape: {adata_sc.shape}"
+    )
+
+    if sum(adata_sc_augmented.X.sum(axis=1) == 0) > 0:
+        logger.warning(f"Input contains cells with 0 expression")
+
+    logger.info("Performing normalization and ")
 
     return adata_sc_augmented, adata_st, markers_intersect
 
 
 def plot_loss_curve(ce, path):
-    plt.plot(ce.train_loss_history, label="Training loss")
-    plt.plot(ce.val_loss_history, label="Validation loss")
-    plt.legend(loc="upper left")
+    fig, axs = plt.subplots(2)
+    axs[0].plot(ce.train_loss_history_contrastive, label="Training loss contr")
+    axs[0].plot(ce.val_loss_history_contrastive, label="Validation loss contr")
+    axs[1].plot(ce.train_loss_history_classification, label="Training loss class")
+    axs[1].plot(ce.val_loss_history_classification, label="Validation loss class")
+
+    axs[0].legend(loc="upper left")
+    axs[1].legend(loc="upper left")
     plt.title("Model loss")
-    plt.ylabel("loss")
-    plt.xlabel("epoch")
+    axs[0].set_ylabel("loss")
+    axs[0].set_xlabel("epoch")
+    axs[1].set_ylabel("loss")
+    axs[1].set_xlabel("epoch")
+    plt.tight_layout()
     plt.savefig(path)
-    logger.info(f"Saved the loss curve .png to {path}")
+    logger.info(f"Saved the loss curves .png to {path}")
 
 
 if __name__ == "__main__":
@@ -706,6 +762,10 @@ if __name__ == "__main__":
 
     adata_sc = sc.read(args.sc_path)
     adata_st = sc.read(args.st_path)
+    adata_sc.obs_names_make_unique()
+    adata_sc.var_names_make_unique()
+    adata_st.obs_names_make_unique()
+    adata_st.var_names_make_unique()
     logger.info("Loaded data...")
 
     if not scipy.sparse.issparse(adata_sc.X):
@@ -717,7 +777,8 @@ if __name__ == "__main__":
         logger.info("Converted ST gene exp matrix to csr")
 
     adata_sc, adata_st, markers_intersect = subset_marker_genes(adata_sc, adata_st)
-    logger.info("Found intersecting marker genes, performed subset on ST and SC")
+
+    # perform preprocessing like removing all 0 vectors, normalization and scaling
 
     X = adata_sc.X.toarray()
     logger.info("Input ready...")
@@ -728,9 +789,9 @@ if __name__ == "__main__":
     logger.info("Labels ready...")
 
     fix_seed(0)
-    EMB_DIM = 64
-    ENC_DEPTH = 5
-    HIDD_DEPTH = 3
+    EMB_DIM = 128
+    ENC_DEPTH = 4
+    HIDD_DEPTH = 2
     ce = ContrastiveEncoder(
         out_dim=len(le.classes_),
         epochs=args.epochs,
