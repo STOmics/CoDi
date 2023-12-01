@@ -10,6 +10,7 @@ import os
 from zoneinfo import ZoneInfo
 import sys
 
+import anndata as ad
 from matplotlib import pyplot as plt
 import numpy as np
 import scanpy as sc
@@ -27,16 +28,9 @@ from torch.cuda.amp import GradScaler
 from torch.optim import Adam
 from torch.utils.data import DataLoader
 from tqdm.auto import tqdm
-from sklearn.metrics import (
-    accuracy_score,
-    f1_score,
-    confusion_matrix,
-    roc_auc_score,
-    roc_curve,
-    auc,
-)
+from sklearn.metrics import accuracy_score, f1_score
 
-from contrastive_augmentation import augment_data
+from .contrastive_augmentation import augment_data
 
 dirs = ["logs", "loss_curves", "contrastive_res", "models"]
 for d in dirs:
@@ -427,10 +421,6 @@ class ContrastiveEncoder(BaseEstimator, TransformerMixin):
             train_loss_contrastive = 0.0
             train_loss_classification = 0.0
 
-            # Best Practices
-            # We strongly recommend using mixed precision with torch.amp or the TF32 mode
-            # (on Ampere and later CUDA devices) whenever possible when training a network.
-
             for anchor, positive, negative, anchor_target in train_loader:
                 anchor, positive, negative, anchor_target = (
                     anchor.to(self.device),
@@ -443,7 +433,6 @@ class ContrastiveEncoder(BaseEstimator, TransformerMixin):
                 optimizer.zero_grad()
 
                 # get embeddings
-                # with torch.autocast(device_type="cuda", dtype=torch.float16):
                 emb_anchor, emb_positive, emb_negative, log_reg = self.model(
                     anchor, positive, negative
                 )
@@ -475,14 +464,12 @@ class ContrastiveEncoder(BaseEstimator, TransformerMixin):
                         anchor_target,
                         log_reg,
                     )
-                # scaler.scale(loss).backward()
                 loss = loss_contrastive + loss_classification
                 loss.backward()
 
                 # update model weights
-                # scaler.step(optimizer)
                 optimizer.step()
-                # scaler.update()
+
                 # log progress
                 train_loss_contrastive += anchor.size(0) * loss_contrastive.item()
                 train_loss_classification += anchor.size(0) * loss_classification.item()
@@ -502,7 +489,6 @@ class ContrastiveEncoder(BaseEstimator, TransformerMixin):
                         negative.to(self.device),
                         anchor_target.to(self.device),
                     )
-                    # with torch.autocast(device_type="cuda", dtype=torch.float16):
                     # get embeddings
                     emb_anchor, emb_positive, emb_negative, log_reg = self.model(
                         anchor, positive, negative
@@ -727,24 +713,28 @@ def plot_loss_curve(ce, path):
 
 
 def contrastive_process(
-    sc_path,
-    st_path,
-    annotation_sc,
-    annotation_st,
-    epochs=50,
-    embedding_dim=32,
-    encoder_depth=4,
-    classifier_depth=2,
+    adata_sc: str | ad.AnnData,
+    adata_st: str | ad.AnnData,
+    annotation_sc: str,
+    epochs: int = 50,
+    embedding_dim: int = 32,
+    encoder_depth: int = 4,
+    classifier_depth: int = 2,
 ):
     fix_seed(0)
 
-    adata_sc = sc.read(sc_path)
-    adata_st = sc.read(st_path)
+    if type(adata_sc) is str:
+        adata_sc = sc.read(adata_sc)
+        adata_sc.var_names_make_unique()
+        logger.info("Loaded SC data...")
+
+    if type(adata_st) is str:
+        adata_st = sc.read(adata_st)
+        adata_st.var_names_make_unique()
+        logger.info("Loaded ST data...")
+
     adata_sc.obs_names_make_unique()
-    adata_sc.var_names_make_unique()
     adata_st.obs_names_make_unique()
-    adata_st.var_names_make_unique()
-    logger.info("Loaded data...")
 
     if not scipy.sparse.issparse(adata_sc.X):
         adata_sc.X = scipy.sparse.csr_matrix(adata_sc.X)
@@ -792,43 +782,32 @@ def contrastive_process(
         f"loss_curves/loss_size_{X.shape[0]}_cells_{len(le.classes_)}_epochs_{epochs}_{timestamp}.png",
     )
 
-    # testing
-    logger.info("----------------------------")
-    logger.info(f"Model trained on: {sc_path}")
-
     y_pred = ce.predict(X_test)
     y_true = y_test
     acc = accuracy_score(le.inverse_transform(y_true), le.inverse_transform(y_pred))
     f1 = f1_score(
         le.inverse_transform(y_true), le.inverse_transform(y_pred), average="macro"
     )
-    logger.info("----------------------------")
+
+    logger.info("-------------Test data------------")
     logger.info(f"Accuracy: {acc}")
     logger.info(f"F1 macro score: {f1}")
-    logger.info("----------------------------")
-    files = args.to_predict.split(",")
+    logger.info("----------------------------------")
 
-    for file in files:
-        if not file:
-            continue
-        ad = sc.read(file)
-        ad.var_names_make_unique()
-        ad = ad[:, markers_intersect]
-        if not scipy.sparse.issparse(ad.X):
-            ad.X = scipy.sparse.csr_matrix(ad.X)
-            # logger.info(f"Converted SC gene exp matrix of {file} to csr")
-        y_pred = ce.predict(ad.X.toarray())
-        y_true = ad.obs[args.annotation_st]
-        acc = accuracy_score(y_true, le.inverse_transform(y_pred))
-        f1 = f1_score(y_true, le.inverse_transform(y_pred), average="macro")
-        logger.info(f"Results for: {file}")
-        logger.info(f"Accuracy: {acc}")
-        logger.info(f"F1 macro score: {f1}")
-        logger.info("-------------------------")
-        ad.obs["contrastive"] = le.inverse_transform(y_pred)
-        fname = file.split(".")[-1]
-        ad.obs["contrastive"].to_csv(f"contrastive_res/{fname}.csv")
-    # implement saving
+    logger.info("-------------ST prediction------------")
+    adata_st.var_names_make_unique()
+    adata_st = adata_st[:, markers_intersect]
+    if not scipy.sparse.issparse(adata_st.X):
+        adata_st.X = scipy.sparse.csr_matrix(adata_st.X)
+        logger.info(f"Converted gene exp matrix of ST to csr_matrix")
+    y_pred = ce.predict(adata_st.X.toarray())
+    adata_st.obs["contrastive"] = le.inverse_transform(y_pred)
+    adata_st.obs["contrastive"].to_csv(
+        f"contrastive_res/contrastive_pred_{timestamp}.csv"
+    )
+    logger.info(
+        f"Saved ST prediction result in contrastive_res/contrastive_pred_{timestamp}.csv"
+    )
 
 
 if __name__ == "__main__":
@@ -860,13 +839,6 @@ if __name__ == "__main__":
         type=str,
         required=False,
         default="cell_subclass",
-    )
-    parser.add_argument(
-        "--annotation_st",
-        help="Annotation label for cell types of spatially resolved dataset used for testing only",
-        type=str,
-        required=False,
-        default="annotation",
     )
     parser.add_argument(
         "--to_predict",
@@ -903,7 +875,6 @@ if __name__ == "__main__":
         args.sc_path,
         args.st_path,
         args.annotation_sc,
-        args.annotation_st,
         args.epochs,
         args.embedding_dim,
         args.encoder_depth,
