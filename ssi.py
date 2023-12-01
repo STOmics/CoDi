@@ -48,7 +48,15 @@ parser.add_argument(
     type=str,
     required=False,
     default="KLD",
-    choices={"mahalanobis", "KLD", "wasserstein", "relativeEntropy", "hellinger", "binary"},
+    choices={
+        "mahalanobis",
+        "KLD",
+        "wasserstein",
+        "relativeEntropy",
+        "hellinger",
+        "binary",
+        "none",
+    },
 )
 parser.add_argument(
     "--num_markers",
@@ -81,11 +89,13 @@ adata_st.var_names_make_unique()
 # Read datasets and check if matrix is sparse
 sc_df_raw = pd.DataFrame(
     adata_sc.X.toarray() if issparse(adata_sc.X) else adata_sc.X,
-    index=adata_sc.obs.index, columns=adata_sc.var.index
+    index=adata_sc.obs.index,
+    columns=adata_sc.var.index,
 ).copy()
 st_df_raw = pd.DataFrame(
     adata_st.X.toarray() if issparse(adata_st.X) else adata_st.X,
-    index=adata_st.obs.index, columns=adata_st.var.index
+    index=adata_st.obs.index,
+    columns=adata_st.var.index,
 ).copy()
 
 # Calculate marker genes
@@ -114,9 +124,7 @@ logger.info(
 )
 end_marker = time.time()
 marker_time = np.round(end_marker - start_marker, 3)
-logger.info(
-    f"Calculation of marker genes took {marker_time}"
-)
+logger.info(f"Calculation of marker genes took {marker_time}")
 sc_df = sc_df_raw.loc[:, markers_intersect]
 st_df = st_df_raw.loc[:, markers_intersect]
 cell_types = set(adata_sc.obs[args.annotation])
@@ -165,18 +173,21 @@ assigned_types = []
 
 iis = [ii for ii in range(len(st_df))]
 
+
 def hellinger(p, q):
     """Hellinger distance between distributions"""
-    p= np.array(p)
-    q= np.array(q)
-    result = np.sum((np.sqrt(p) - np.sqrt(q))**2) / np.sqrt(2)
+    p = np.array(p)
+    q = np.array(q)
+    result = np.sum((np.sqrt(p) - np.sqrt(q)) ** 2) / np.sqrt(2)
     return result
 
+
 def binary_distance(p, q):
-    '''Binary distance between distributions.
+    """Binary distance between distributions.
     Sum all the positional pairs in both distributions which are
-    of different status: one zero, while other nonzero.'''
+    of different status: one zero, while other nonzero."""
     return np.sum(p.astype(bool) ^ q.astype(bool))
+
 
 def per_cell(ii):
     best_matches_subsets = []
@@ -186,10 +197,16 @@ def per_cell(ii):
             st_distrib = st_df.iloc[ii, :][subset].values.astype(float)
             sc_distrib = sc_mean[cell_type][subset_id].values.astype(float)
             # normalize to sum 1.0 if sum is not 0
-            st_distrib_norm = st_distrib / np.sum(st_distrib, axis=0, keepdims=True) \
-                if np.sum(st_distrib, axis=0, keepdims=True) != 0 else st_distrib
-            sc_distrib_norm = sc_distrib / np.sum(sc_distrib, axis=0, keepdims=True) \
-                if np.sum(sc_distrib, axis=0, keepdims=True) != 0 else sc_distrib
+            st_distrib_norm = (
+                st_distrib / np.sum(st_distrib, axis=0, keepdims=True)
+                if np.sum(st_distrib, axis=0, keepdims=True) != 0
+                else st_distrib
+            )
+            sc_distrib_norm = (
+                sc_distrib / np.sum(sc_distrib, axis=0, keepdims=True)
+                if np.sum(sc_distrib, axis=0, keepdims=True) != 0
+                else sc_distrib
+            )
             if args.distance == "mahalanobis":
                 distance = mahalanobis(
                     st_distrib_norm,
@@ -211,7 +228,7 @@ def per_cell(ii):
                     st_distrib_norm,
                     sc_distrib_norm,
                 )
-            elif args.distance == 'hellinger':
+            elif args.distance == "hellinger":
                 distance = hellinger(
                     st_distrib_norm,
                     sc_distrib_norm,
@@ -235,9 +252,8 @@ def per_cell(ii):
     pbar.update(1)  # global variable
     return (ii, best_match_subset)
 
-logger.info(
-    f"Starting parallel per cell calculation of distances."
-)
+
+logger.info(f"Starting parallel per cell calculation of distances.")
 pbar = tqdm(total=len(st_df))
 with mp.Pool(processes=num_cpus_used) as pool:
     assigned_types = pool.map(per_cell, iis)
@@ -247,14 +263,19 @@ assigned_types = [at[1] for at in assigned_types]
 end = time.time()
 logger.info(f"SSI execution took: {end - start}s")
 adata_st.obs["ssi"] = [x["cell_type"] for x in assigned_types]
-adata_st.obs['confidence'] = [x["confidence"] for x in assigned_types]
+adata_st.obs["confidence"] = [x["confidence"] for x in assigned_types]
 # sns.histplot([x["confidence"] for x in assigned_types])
 # plt.savefig(f"ssi_confidence_hist__{args.distance}.png", dpi=120, bbox_inches="tight")
 
 # Write CSV and H5AD
-adata_st.obs.index.name = 'cell_id'
-adata_st.obs[["ssi"]].to_csv(os.path.basename(args.st_path).replace(".h5ad", f"_ssi_{args.distance}.csv"))
-adata_st.write_h5ad(os.path.basename(args.st_path).replace(".h5ad", f"_ssi_{args.distance}.h5ad"))
+adata_st.obs.index.name = "cell_id"
+adata_st.obs[["ssi"]].to_csv(
+    os.path.basename(args.st_path).replace(".h5ad", f"_ssi_{args.distance}.csv")
+)
+adata_st.write_h5ad(
+    os.path.basename(args.st_path).replace(".h5ad", f"_ssi_{args.distance}.h5ad")
+)
+
 
 # Visualisation
 def plot_spatial(
@@ -284,8 +305,10 @@ def plot_spatial(
         ax=ax,
         s=s,
         linewidth=0,
-        palette=palette if ('float' in str(type(adata.obs[annotation][0])).lower()) else None,
-        marker="."
+        palette=palette
+        if ("float" in str(type(adata.obs[annotation][0])).lower())
+        else None,
+        marker=".",
     )
     ax.invert_yaxis()
     ax.set(yticklabels=[], xticklabels=[], title=title)
@@ -293,23 +316,24 @@ def plot_spatial(
     ax.set_aspect("equal")
     sns.despine(bottom=True, left=True, ax=ax)
 
+
 if "spatial" in adata_st.obsm_keys():
     fig, axs = plt.subplots(1, 2, figsize=(14, 14))
     plot_spatial(
-        adata_st,
-        annotation=f"ssi",
-        spot_size=50,
-        ax=axs[0],
-        title="Cell types"
+        adata_st, annotation=f"ssi", spot_size=50, ax=axs[0], title="Cell types"
     )
     plot_spatial(
         adata_st,
         annotation=f"confidence",
         spot_size=50,
         ax=axs[1],
-        title="Confidence map"
+        title="Confidence map",
     )
-    plt.savefig(os.path.basename(args.st_path).replace(".h5ad", f"_ssi_{args.distance}.png"), dpi=120, bbox_inches="tight")
+    plt.savefig(
+        os.path.basename(args.st_path).replace(".h5ad", f"_ssi_{args.distance}.png"),
+        dpi=120,
+        bbox_inches="tight",
+    )
 
 end = time.time()
 logger.info(f"Total execution time: {end - start}s")

@@ -8,6 +8,7 @@ import time
 import random
 import os
 from zoneinfo import ZoneInfo
+import sys
 
 from matplotlib import pyplot as plt
 import numpy as np
@@ -46,11 +47,12 @@ timestamp = datetime.datetime.now(tz=ZoneInfo("Europe/Berlin")).strftime(
     "%d_%m_%Y_%H_%M_%S"
 )
 logging.basicConfig(
-    format="%(asctime)s %(name)-12s %(levelname)-8s %(message)s",
+    format="%(asctime)s [%(threadName)-12.12s] %(name)-12s [%(levelname)-8s] %(message)s",
     level=logging.INFO,
     filename=f"logs/{timestamp}.log",
 )
 logger = logging.getLogger(__name__)
+logger.addHandler(logging.StreamHandler(sys.stdout))
 
 
 class CombinedLoss(nn.Module):
@@ -152,24 +154,26 @@ class MLP(torch.nn.Sequential):
 
 
 class DeepEncoder(nn.Module):
-    def __init__(self, input_dim, emb_dim, encoder_depth=4, hidden_depth=2, out_dim=1):
+    def __init__(
+        self, input_dim, emb_dim, encoder_depth=4, classifier_depth=2, out_dim=1
+    ):
         """Implementation of deep encoder consisted of: 1. Input layer MLP, 2. Hidden layer MLP 3. Linear.
         Args:
             input_dim (int): size of the inputs
             emb_dim (int): dimension of the embedding space
             encoder_depth (int, optional): number of layers of the encoder MLP. Defaults to 4.
-            hidden_depth (int, optional): number of layers of the hidden head. Defaults to 2.
+            classifier_depth (int, optional): number of layers of the hidden head. Defaults to 2.
         """
         super().__init__()
-        self.hidden_depth = hidden_depth
+        self.classifier_depth = classifier_depth
         self.encoder = MLP(input_dim, emb_dim, encoder_depth, dropout=0.2)
-        if self.hidden_depth > 0:
-            self.classifier = MLP(emb_dim, emb_dim, hidden_depth, dropout=0.2)
+        if self.classifier_depth > 0:
+            self.classifier = MLP(emb_dim, emb_dim, classifier_depth, dropout=0.2)
         self.linear = torch.nn.Linear(emb_dim, out_dim)
 
         # initialize weights
         self.encoder.apply(self._init_weights)
-        if self.hidden_depth > 0:
+        if self.classifier_depth > 0:
             self.classifier.apply(self._init_weights)
         self.linear.apply(self._init_weights)
 
@@ -184,11 +188,11 @@ class DeepEncoder(nn.Module):
 
         # compute embeddings
         emb_anchor = self.encoder(anchor)
-        if self.hidden_depth > 0:
+        if self.classifier_depth > 0:
             emb_anchor = self.classifier(emb_anchor)
 
         emb_positive = self.encoder(positive)
-        if self.hidden_depth > 0:
+        if self.classifier_depth > 0:
             emb_positive = self.classifier(emb_positive)
 
         emb_negative = (
@@ -196,7 +200,7 @@ class DeepEncoder(nn.Module):
             if random_neg.dim() == 3
             else self.encoder(negative)
         )
-        if self.hidden_depth > 0:
+        if self.classifier_depth > 0:
             emb_negative = (
                 [self.classifier(emb_neg) for emb_neg in emb_negative]
                 if random_neg.dim() == 3
@@ -209,7 +213,7 @@ class DeepEncoder(nn.Module):
 
     def get_embeddings(self, input_data):
         emb_anchor = self.encoder(input_data)
-        if self.hidden_depth > 0:
+        if self.classifier_depth > 0:
             emb_anchor = self.classifier(emb_anchor)
         return emb_anchor
 
@@ -284,7 +288,7 @@ class ContrastiveEncoder(BaseEstimator, TransformerMixin):
         epochs=50,
         emb_dim=16,
         encoder_depth=4,
-        hidden_depth=2,
+        classifier_depth=2,
         contrastive_only_perc=0.3,
         contrastive_weight=0.8,
         freeze_encoder=True,
@@ -303,7 +307,7 @@ class ContrastiveEncoder(BaseEstimator, TransformerMixin):
                 epochs (int, optional): number of to train deep encoder. Defaults to 500.
                 emb_dim (int, optional): Dimension of the output embeddings. Defaults to 16.
                 encoder_depth (int, optional): Number of layers in the input MLP layer
-                hidden_depth (int, optional): Number of layers in the hidden MLP layer
+                classifier_depth (int, optional): Number of layers in the classifier MLP layer
                 contrastive_only_perc (float [0, 1], optional): % of epochs to use only contrastive loss for training
                 contrastive_weight (float [0, 1], optional): Weight of contrastive loss  when combined in cross-entropy
                                                              loss of logistic regression with formula:
@@ -318,7 +322,7 @@ class ContrastiveEncoder(BaseEstimator, TransformerMixin):
         self.epochs = epochs
         self.emb_dim = emb_dim
         self.encoder_depth = encoder_depth
-        self.hidden_depth = hidden_depth
+        self.classifier_depth = classifier_depth
         self.out_dim = out_dim
         self.contrastive_only_perc = contrastive_only_perc
         self.contrastive_weight = contrastive_weight
@@ -389,12 +393,12 @@ class ContrastiveEncoder(BaseEstimator, TransformerMixin):
             emb_dim=self.emb_dim,
             out_dim=self.out_dim,
             encoder_depth=self.encoder_depth,
-            hidden_depth=self.hidden_depth,
+            classifier_depth=self.classifier_depth,
         ).to(self.device)
 
         params = [
-            {"params": self.model.encoder.parameters(), "lr": 0.001},
-            {"params": self.model.classifier.parameters(), "lr": 0.007},
+            {"params": self.model.encoder.parameters(), "lr": 0.01},
+            {"params": self.model.classifier.parameters(), "lr": 0.001},
         ]
 
         optimizer = Adam(params)
@@ -448,7 +452,7 @@ class ContrastiveEncoder(BaseEstimator, TransformerMixin):
                 if epoch <= self.contrastive_only_perc * self.epochs:
                     # consider only contrastive loss until encoder trains enough
                     # freeze classifier weights for training only on contrastive loss
-                    if self.freeze_hidden and self.hidden_depth > 0:
+                    if self.freeze_hidden and self.classifier_depth > 0:
                         for param in self.model.classifier.parameters():
                             param.requires_grad = False
                     loss_contrastive, loss_classification = combined_loss(
@@ -461,7 +465,7 @@ class ContrastiveEncoder(BaseEstimator, TransformerMixin):
                     #     for param in self.model.encoder.parameters():
                     #         param.requires_grad = False
                     # unfreeze weights of the classifier to use combined loss
-                    if self.freeze_hidden and self.hidden_depth > 0:
+                    if self.freeze_hidden and self.classifier_depth > 0:
                         for param in self.model.classifier.parameters():
                             param.requires_grad = True
                     loss_contrastive, loss_classification = combined_loss(
@@ -578,7 +582,7 @@ class ContrastiveEncoder(BaseEstimator, TransformerMixin):
             emb_dim=self.emb_dim,
             out_dim=self.out_dim,
             encoder_depth=self.encoder_depth,
-            hidden_depth=self.hidden_depth,
+            classifier_depth=self.classifier_depth,
         )
         self.model.load_state_dict(torch.load(path))
         self.model.to(self.device)
@@ -653,7 +657,7 @@ def fix_seed(seed):
     torch.cuda.manual_seed(seed)
 
 
-def subset_marker_genes(adata_sc, adata_st):
+def subset_on_marker_genes_with_augmentation(adata_sc, adata_st, annotation_sc):
     """Calculates marker genes
 
     Get marker genes on SC dataset by taking the first 100 markers for each cell type and then
@@ -674,7 +678,7 @@ def subset_marker_genes(adata_sc, adata_st):
     sc.pp.normalize_total(adata_sc, target_sum=1e4)
     sc.pp.log1p(adata_sc)
     adata_sc.var_names_make_unique()
-    sc.tl.rank_genes_groups(adata_sc, groupby=args.annotation, use_raw=False)
+    sc.tl.rank_genes_groups(adata_sc, groupby=annotation_sc, use_raw=False)
 
     markers_df = pd.DataFrame(adata_sc.uns["rank_genes_groups"]["names"]).iloc[0:100, :]
     markers = list(np.unique(markers_df.melt().value.values))
@@ -689,7 +693,7 @@ def subset_marker_genes(adata_sc, adata_st):
     adata_sc = adata_sc[:, markers_intersect]
 
     adata_sc_augmented = augment_data(
-        adata_sc, annotation=args.annotation, percentage=0.4
+        adata_sc, annotation=annotation_sc, percentage=0.4
     )
     logger.info(
         f"Augmentation and rebalancing created new anndata object of shape: {adata_sc_augmented.shape} compared to old shape: {adata_sc.shape}"
@@ -722,6 +726,111 @@ def plot_loss_curve(ce, path):
     logger.info(f"Saved the loss curves .png to {path}")
 
 
+def contrastive_process(
+    sc_path,
+    st_path,
+    annotation_sc,
+    annotation_st,
+    epochs=50,
+    embedding_dim=32,
+    encoder_depth=4,
+    classifier_depth=2,
+):
+    fix_seed(0)
+
+    adata_sc = sc.read(sc_path)
+    adata_st = sc.read(st_path)
+    adata_sc.obs_names_make_unique()
+    adata_sc.var_names_make_unique()
+    adata_st.obs_names_make_unique()
+    adata_st.var_names_make_unique()
+    logger.info("Loaded data...")
+
+    if not scipy.sparse.issparse(adata_sc.X):
+        adata_sc.X = scipy.sparse.csr_matrix(adata_sc.X)
+        logger.info("Converted SC gene exp matrix to csr")
+
+    if not scipy.sparse.issparse(adata_st.X):
+        adata_st.X = scipy.sparse.csr_matrix(adata_st.X)
+        logger.info("Converted ST gene exp matrix to csr")
+
+    adata_sc, adata_st, markers_intersect = subset_on_marker_genes_with_augmentation(
+        adata_sc, adata_st, annotation_sc
+    )
+
+    # perform preprocessing like removing all 0 vectors, normalization and scaling
+
+    X = adata_sc.X.toarray()
+    logger.info("Input ready...")
+
+    y = adata_sc.obs[annotation_sc]
+    le = LabelEncoder()
+    y_le = le.fit_transform(y)
+    logger.info("Labels ready...")
+
+    ce = ContrastiveEncoder(
+        out_dim=len(le.classes_),
+        epochs=epochs,
+        emb_dim=embedding_dim,
+        encoder_depth=encoder_depth,
+        classifier_depth=classifier_depth,
+    )
+
+    X_train, X_test, y_train, y_test = train_test_split(
+        X, y_le, test_size=0.1, random_state=42, stratify=y_le
+    )
+    logger.info(
+        f"""Fitting a model with: \n - embedding dim: {embedding_dim} \n - encoder depth: {encoder_depth} \n - classifier depth: {classifier_depth} \n - epochs: {epochs}"""
+    )
+    ce.fit(X_train, y_train)
+    logger.info("Finished training...")
+    model_save_path = f"models/{X.shape[0]}_cells_{timestamp}.pt"
+    ce.save_model(model_save_path)
+    logger.info(f"Saved the model to {model_save_path}")
+    plot_loss_curve(
+        ce,
+        f"loss_curves/loss_size_{X.shape[0]}_cells_{len(le.classes_)}_epochs_{epochs}_{timestamp}.png",
+    )
+
+    # testing
+    logger.info("----------------------------")
+    logger.info(f"Model trained on: {sc_path}")
+
+    y_pred = ce.predict(X_test)
+    y_true = y_test
+    acc = accuracy_score(le.inverse_transform(y_true), le.inverse_transform(y_pred))
+    f1 = f1_score(
+        le.inverse_transform(y_true), le.inverse_transform(y_pred), average="macro"
+    )
+    logger.info("----------------------------")
+    logger.info(f"Accuracy: {acc}")
+    logger.info(f"F1 macro score: {f1}")
+    logger.info("----------------------------")
+    files = args.to_predict.split(",")
+
+    for file in files:
+        if not file:
+            continue
+        ad = sc.read(file)
+        ad.var_names_make_unique()
+        ad = ad[:, markers_intersect]
+        if not scipy.sparse.issparse(ad.X):
+            ad.X = scipy.sparse.csr_matrix(ad.X)
+            # logger.info(f"Converted SC gene exp matrix of {file} to csr")
+        y_pred = ce.predict(ad.X.toarray())
+        y_true = ad.obs[args.annotation_st]
+        acc = accuracy_score(y_true, le.inverse_transform(y_pred))
+        f1 = f1_score(y_true, le.inverse_transform(y_pred), average="macro")
+        logger.info(f"Results for: {file}")
+        logger.info(f"Accuracy: {acc}")
+        logger.info(f"F1 macro score: {f1}")
+        logger.info("-------------------------")
+        ad.obs["contrastive"] = le.inverse_transform(y_pred)
+        fname = file.split(".")[-1]
+        ad.obs["contrastive"].to_csv(f"contrastive_res/{fname}.csv")
+    # implement saving
+
+
 if __name__ == "__main__":
     parser = ap.ArgumentParser(
         description="A script that trains a contrastive learning model and performs prediction on ST dataset."
@@ -746,8 +855,7 @@ if __name__ == "__main__":
         required=False,
     )
     parser.add_argument(
-        "-a",
-        "--annotation",
+        "--annotation_sc",
         help="Annotation label for cell types of single cell dataset",
         type=str,
         required=False,
@@ -767,96 +875,37 @@ if __name__ == "__main__":
         required=False,
         default="",
     )
+    parser.add_argument(
+        "--embedding_dim",
+        help="Dimension of the embedding of the encoder",
+        type=int,
+        default=32,
+        required=False,
+    )
+    parser.add_argument(
+        "--encoder_depth",
+        help="Number of hidden layers inside encoder",
+        type=int,
+        default=4,
+        required=False,
+    )
+    parser.add_argument(
+        "--classifier_depth",
+        help="Number of hidden layers inside the classifier",
+        type=int,
+        default=2,
+        required=False,
+    )
 
     args = parser.parse_args()
 
-    adata_sc = sc.read(args.sc_path)
-    adata_st = sc.read(args.st_path)
-    adata_sc.obs_names_make_unique()
-    adata_sc.var_names_make_unique()
-    adata_st.obs_names_make_unique()
-    adata_st.var_names_make_unique()
-    logger.info("Loaded data...")
-
-    if not scipy.sparse.issparse(adata_sc.X):
-        adata_sc.X = scipy.sparse.csr_matrix(adata_sc.X)
-        logger.info("Converted SC gene exp matrix to csr")
-
-    if not scipy.sparse.issparse(adata_st.X):
-        adata_st.X = scipy.sparse.csr_matrix(adata_st.X)
-        logger.info("Converted ST gene exp matrix to csr")
-
-    adata_sc, adata_st, markers_intersect = subset_marker_genes(adata_sc, adata_st)
-
-    # perform preprocessing like removing all 0 vectors, normalization and scaling
-
-    X = adata_sc.X.toarray()
-    logger.info("Input ready...")
-
-    y = adata_sc.obs[args.annotation]
-    le = LabelEncoder()
-    y_le = le.fit_transform(y)
-    logger.info("Labels ready...")
-
-    fix_seed(0)
-    EMB_DIM = 64
-    ENC_DEPTH = 4
-    HIDD_DEPTH = 2
-    ce = ContrastiveEncoder(
-        out_dim=len(le.classes_),
-        epochs=args.epochs,
-        emb_dim=EMB_DIM,
-        encoder_depth=ENC_DEPTH,
-        hidden_depth=HIDD_DEPTH,
+    contrastive_process(
+        args.sc_path,
+        args.st_path,
+        args.annotation_sc,
+        args.annotation_st,
+        args.epochs,
+        args.embedding_dim,
+        args.encoder_depth,
+        args.classifier_depth,
     )
-
-    X_train, X_test, y_train, y_test = train_test_split(
-        X, y_le, test_size=0.1, random_state=42, stratify=y_le
-    )
-    logger.info(
-        f"""Fitting a model with: \n - embedding dim: {EMB_DIM} \n - encoder depth: {ENC_DEPTH} \n - hidden depth: {HIDD_DEPTH} in {args.epochs} epochs"""
-    )
-    ce.fit(X, y_le)
-    logger.info("Finished training...")
-    model_save_path = f"models/{X.shape[0]}_cells_{timestamp}.pt"
-    ce.save_model(model_save_path)
-    logger.info(f"Saved the model to {model_save_path}")
-    plot_loss_curve(
-        ce,
-        f"loss_curves/loss_size_{X.shape[0]}_cells_{len(le.classes_)}_epochs_{args.epochs}_{timestamp}.png",
-    )
-
-    # testing
-    logger.info("----------------------------")
-    logger.info(f"Model trained on: {args.sc_path}")
-
-    y_pred = ce.predict(X_test)
-    y_true = y_test
-    acc = accuracy_score(le.inverse_transform(y_true), le.inverse_transform(y_pred))
-    f1 = f1_score(
-        le.inverse_transform(y_true), le.inverse_transform(y_pred), average="macro"
-    )
-    logger.info("----------------------------")
-    logger.info(f"Accuracy: {acc}")
-    logger.info(f"F1 macro score: {f1}")
-    logger.info("----------------------------")
-    files = args.to_predict.split(",")
-    for file in files:
-        ad = sc.read(file)
-        ad.var_names_make_unique()
-        ad = ad[:, markers_intersect]
-        if not scipy.sparse.issparse(ad.X):
-            ad.X = scipy.sparse.csr_matrix(ad.X)
-            # logger.info(f"Converted SC gene exp matrix of {file} to csr")
-        y_pred = ce.predict(ad.X.toarray())
-        y_true = ad.obs[args.annotation_st]
-        acc = accuracy_score(y_true, le.inverse_transform(y_pred))
-        f1 = f1_score(y_true, le.inverse_transform(y_pred), average="macro")
-        logger.info(f"Results for: {file}")
-        logger.info(f"Accuracy: {acc}")
-        logger.info(f"F1 macro score: {f1}")
-        logger.info("-------------------------")
-        ad.obs["contrastive"] = le.inverse_transform(y_pred)
-        fname = file.split(".")[-1]
-        ad.obs["contrastive"].to_csv(f"contrastive_res/{fname}.csv")
-    # implement saving
