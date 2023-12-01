@@ -2,6 +2,7 @@ import os
 import subprocess
 import json
 import sys
+import time
 
 import scanpy as sc
 import pandas as pd
@@ -21,8 +22,17 @@ annotation = config["annotation"]
 command_gen = config["command"]
 algo_suffix = config["output_suffix"]
 
+start = time.time()
 # Read HQ data
 adata_sc = sc.read_h5ad(hq_path)
+adata_sc.var_names_make_unique()
+
+def is_number(s):
+    try:
+        float(s)
+        return True
+    except ValueError:
+        return False
 
 def calc_metric(actual_labels, pred, ind):
     # Calculate the F-score per class (macro) since micro is the same as accuracy
@@ -33,9 +43,10 @@ def calc_metric(actual_labels, pred, ind):
 
     # Create a pandas DataFrame to store the results
     results_df = pd.DataFrame({
+        'Subsample': [ind],
         'F-score': [f_score],
         'Accuracy': [acc_score]
-    }, index=[ind])
+    })
     return results_df
 
 out_df = pd.DataFrame()
@@ -43,12 +54,29 @@ for lq_path in lq_paths:
     print(f"Processing {lq_path}")
     
     command = command_gen.replace("hq_path", hq_path).replace("lq_path", lq_path).replace("annotation", annotation)
-    lq_path_pred = os.path.basename(lq_path).replace(".h5ad", f"_{algo_suffix}.h5ad")
+    command_split = command.split(" ")
+    if algo_suffix == "ssi":
+        if '-d' in command_split:
+            distance_metric = command_split[[h for h, value in enumerate(command_split) if value == '-d'][0]+1]
+        else:
+            distance_metric = "KLD"
+        lq_path_pred = os.path.basename(lq_path).replace(".h5ad", f"_{algo_suffix}_{distance_metric}.h5ad")
+        subsample_factor_pos = -3
+        out_file_name = f"../test/benchmark_{algo_suffix}_{distance_metric}.csv"
+    else:
+        lq_path_pred = os.path.basename(lq_path).replace(".h5ad", f"_{algo_suffix}.h5ad")
+        subsample_factor_pos = -2
+        out_file_name = f"../test/benchmark_{algo_suffix}.csv"
     if not os.path.exists(lq_path_pred):
         return_code = subprocess.call(command.split(" "))
     adata_st = sc.read_h5ad(lq_path_pred)
-    subsample_factor = lq_path_pred.split('_')[-2]
-    res_df = calc_metric(adata_sc.obs[annotation], adata_st.obs["sc_type"], subsample_factor)
+    adata_st.var_names_make_unique()
+    subsample_factor = lq_path_pred.split('_')[subsample_factor_pos] \
+        if is_number(lq_path_pred.split('_')[subsample_factor_pos]) else 0.0
+    res_df = calc_metric(adata_sc.obs[annotation], adata_st.obs[algo_suffix], subsample_factor)
     out_df = pd.concat([out_df, res_df])
     print(out_df)
-out_df.to_csv(f"benchmark_{algo_suffix}.csv")
+out_df = out_df.reset_index(drop=True)
+out_df.to_csv(out_file_name)
+end = time.time()
+print(f"benchmark.py took: {end-start}s")
