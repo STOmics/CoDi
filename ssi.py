@@ -2,6 +2,7 @@ import argparse as ap
 from collections import Counter
 import logging
 import multiprocessing as mp
+import sys
 import random
 import time
 import os
@@ -19,7 +20,137 @@ from scipy.sparse import issparse
 import seaborn as sns
 from tqdm import tqdm
 
-random.seed = 3
+import core
+
+random.seed(3)
+
+
+def create_subsets(gene_set, num_of_subsets=10):
+    num_of_elem = len(gene_set)
+    subsets = []
+    for s in range(num_of_subsets):
+        subset_size = random.randint(int(num_of_elem * 0.3), int(num_of_elem * 0.8))
+        subsets.append(random.sample(gene_set, subset_size))
+    return subsets
+
+
+def hellinger(p, q):
+    """Hellinger distance between distributions"""
+    p = np.array(p)
+    q = np.array(q)
+    result = np.sum((np.sqrt(p) - np.sqrt(q)) ** 2) / np.sqrt(2)
+    return result
+
+
+def binary_distance(p, q):
+    """Binary distance between distributions.
+    Sum all the positional pairs in both distributions which are
+    of different status: one zero, while other nonzero."""
+    return np.sum(p.astype(bool) ^ q.astype(bool))
+
+
+def per_cell(ii):
+    best_matches_subsets = []
+    for subset_id, subset in enumerate(subsets):
+        best_match = {"cell_type": "", "dist": 9999999}
+        for cell_type in cell_types:
+            st_distrib = st_df.iloc[ii, :][subset].values.astype(float)
+            sc_distrib = sc_mean[cell_type][subset_id].values.astype(float)
+            # normalize to sum 1.0 if sum is not 0
+            st_distrib_norm = (
+                st_distrib / np.sum(st_distrib, axis=0, keepdims=True)
+                if np.sum(st_distrib, axis=0, keepdims=True) != 0
+                else st_distrib
+            )
+            sc_distrib_norm = (
+                sc_distrib / np.sum(sc_distrib, axis=0, keepdims=True)
+                if np.sum(sc_distrib, axis=0, keepdims=True) != 0
+                else sc_distrib
+            )
+            if args.distance == "mahalanobis":
+                distance = mahalanobis(
+                    st_distrib_norm,
+                    sc_distrib_norm,
+                    sc_icms[cell_type][subset_id],
+                )
+            elif args.distance == "relativeEntropy":
+                distance = rel_entr(
+                    st_distrib_norm,
+                    sc_distrib_norm,
+                ).sum()
+            elif args.distance == "KLD":
+                distance = kl_div(
+                    st_distrib_norm,
+                    sc_distrib_norm,
+                ).sum()
+            elif args.distance == "wasserstein":
+                distance = wasserstein_distance(
+                    st_distrib_norm,
+                    sc_distrib_norm,
+                )
+            elif args.distance == "hellinger":
+                distance = hellinger(
+                    st_distrib_norm,
+                    sc_distrib_norm,
+                )
+            elif args.distance == "binary":
+                distance = binary_distance(
+                    np.floor(st_distrib),
+                    np.floor(sc_distrib),
+                )
+
+            if distance < best_match["dist"]:
+                best_match = {"cell_type": cell_type, "dist": distance}
+        best_matches_subsets.append(best_match)
+
+    # Majority voting
+    cn = Counter([x["cell_type"] for x in best_matches_subsets])
+    best_match_subset = {
+        "cell_type": cn.most_common(1)[0][0],
+        "confidence": np.round(cn.most_common(1)[0][1] / num_of_subsets, 3),
+    }
+    pbar.update(1)  # global variable
+    return (ii, best_match_subset)
+
+
+def plot_spatial(
+    adata, annotation, ax: plt.Axes, spot_size: float, palette=None, title: str = ""
+):
+    """
+    Scatter plot in spatial coordinates.
+
+    Parameters:
+        - adata (AnnData): Annotated data object which represents the sample
+        - annotation (str): adata.obs column used for grouping
+        - ax (Axes): Axes object used for plotting
+        - spot_size (int): Size of the dot that represents a cell. We are passing it as a diameter of the spot, while
+                the plotting library uses radius therefore it is multiplied by 0.5
+        - palette (dict): Dictionary that represents a mapping between annotation categories and colors
+        - title (str): Title of the figure
+
+    """
+    palette = sns.color_palette("coolwarm", as_cmap=True)
+    s = spot_size * 0.5
+    data = adata
+    ax = sns.scatterplot(
+        data=data.obs,
+        hue=annotation,
+        x=data.obsm["spatial"][:, 0],
+        y=data.obsm["spatial"][:, 1],
+        ax=ax,
+        s=s,
+        linewidth=0,
+        palette=palette
+        if ("float" in str(type(adata.obs[annotation][0])).lower())
+        else None,
+        marker=".",
+    )
+    ax.invert_yaxis()
+    ax.set(yticklabels=[], xticklabels=[], title=title)
+    ax.tick_params(bottom=False, left=False)
+    ax.set_aspect("equal")
+    sns.despine(bottom=True, left=True, ax=ax)
+
 
 logging.basicConfig(
     format="%(asctime)s %(name)-12s %(levelname)-8s %(message)s", level=logging.INFO
@@ -48,7 +179,15 @@ parser.add_argument(
     type=str,
     required=False,
     default="KLD",
-    choices={"mahalanobis", "KLD", "wasserstein", "relativeEntropy", "hellinger", "binary"},
+    choices={
+        "mahalanobis",
+        "KLD",
+        "wasserstein",
+        "relativeEntropy",
+        "hellinger",
+        "binary",
+        "none",
+    },
 )
 parser.add_argument(
     "--num_markers",
@@ -64,13 +203,39 @@ parser.add_argument(
     required=False,
     default=-1,
 )
+parser.add_argument("-c", "--contrastive", action="store_true")
 
 args = parser.parse_args()
+
 
 adata_sc = sc.read_h5ad(args.sc_path)
 adata_st = sc.read_h5ad(args.st_path)
 adata_sc.var_names_make_unique()
 adata_st.var_names_make_unique()
+
+# Contrastive part
+if args.contrastive:
+    contrastive_proc = mp.Process(
+        target=core.contrastive_process,
+        kwargs=dict(
+            adata_sc=adata_sc,
+            adata_st=adata_st,
+            annotation_sc=args.annotation,
+            epochs=50,
+            embedding_dim=32,
+            encoder_depth=4,
+            classifier_depth=2,
+        ),
+        name="Contrastive process",
+    )
+    contrastive_proc.start()
+
+
+if args.distance == "none":
+    if args.contrastive:
+        contrastive_proc.join()
+    logger.info(f"No distance metric specified, exiting...")
+    sys.exit()
 
 # Filter cells and genes
 # sc.pp.filter_cells(adata_sc, min_genes=100)
@@ -81,11 +246,13 @@ adata_st.var_names_make_unique()
 # Read datasets and check if matrix is sparse
 sc_df_raw = pd.DataFrame(
     adata_sc.X.toarray() if issparse(adata_sc.X) else adata_sc.X,
-    index=adata_sc.obs.index, columns=adata_sc.var.index
+    index=adata_sc.obs.index,
+    columns=adata_sc.var.index,
 ).copy()
 st_df_raw = pd.DataFrame(
     adata_st.X.toarray() if issparse(adata_st.X) else adata_st.X,
-    index=adata_st.obs.index, columns=adata_st.var.index
+    index=adata_st.obs.index,
+    columns=adata_st.var.index,
 ).copy()
 
 # Calculate marker genes
@@ -114,24 +281,13 @@ logger.info(
 )
 end_marker = time.time()
 marker_time = np.round(end_marker - start_marker, 3)
-logger.info(
-    f"Calculation of marker genes took {marker_time}"
-)
+logger.info(f"Calculation of marker genes took {marker_time}")
 sc_df = sc_df_raw.loc[:, markers_intersect]
 st_df = st_df_raw.loc[:, markers_intersect]
 cell_types = set(adata_sc.obs[args.annotation])
 
 
 # Algo
-def create_subsets(gene_set, num_of_subsets=10):
-    num_of_elem = len(gene_set)
-    subsets = []
-    for s in range(num_of_subsets):
-        subset_size = random.randint(int(num_of_elem * 0.3), int(num_of_elem * 0.8))
-        subsets.append(random.sample(gene_set, subset_size))
-    return subsets
-
-
 # *****************************************
 # Precalculate inverse covariance matrices
 # *****************************************
@@ -165,79 +321,8 @@ assigned_types = []
 
 iis = [ii for ii in range(len(st_df))]
 
-def hellinger(p, q):
-    """Hellinger distance between distributions"""
-    p= np.array(p)
-    q= np.array(q)
-    result = np.sum((np.sqrt(p) - np.sqrt(q))**2) / np.sqrt(2)
-    return result
 
-def binary_distance(p, q):
-    '''Binary distance between distributions.
-    Sum all the positional pairs in both distributions which are
-    of different status: one zero, while other nonzero.'''
-    return np.sum(p.astype(bool) ^ q.astype(bool))
-
-def per_cell(ii):
-    best_matches_subsets = []
-    for subset_id, subset in enumerate(subsets):
-        best_match = {"cell_type": "", "dist": 9999999}
-        for cell_type in cell_types:
-            st_distrib = st_df.iloc[ii, :][subset].values.astype(float)
-            sc_distrib = sc_mean[cell_type][subset_id].values.astype(float)
-            # normalize to sum 1.0 if sum is not 0
-            st_distrib_norm = st_distrib / np.sum(st_distrib, axis=0, keepdims=True) \
-                if np.sum(st_distrib, axis=0, keepdims=True) != 0 else st_distrib
-            sc_distrib_norm = sc_distrib / np.sum(sc_distrib, axis=0, keepdims=True) \
-                if np.sum(sc_distrib, axis=0, keepdims=True) != 0 else sc_distrib
-            if args.distance == "mahalanobis":
-                distance = mahalanobis(
-                    st_distrib_norm,
-                    sc_distrib_norm,
-                    sc_icms[cell_type][subset_id],
-                )
-            elif args.distance == "relativeEntropy":
-                distance = rel_entr(
-                    st_distrib_norm,
-                    sc_distrib_norm,
-                ).sum()
-            elif args.distance == "KLD":
-                distance = kl_div(
-                    st_distrib_norm,
-                    sc_distrib_norm,
-                ).sum()
-            elif args.distance == "wasserstein":
-                distance = wasserstein_distance(
-                    st_distrib_norm,
-                    sc_distrib_norm,
-                )
-            elif args.distance == 'hellinger':
-                distance = hellinger(
-                    st_distrib_norm,
-                    sc_distrib_norm,
-                )
-            elif args.distance == "binary":
-                distance = binary_distance(
-                    np.floor(st_distrib),
-                    np.floor(sc_distrib),
-                )
-
-            if distance < best_match["dist"]:
-                best_match = {"cell_type": cell_type, "dist": distance}
-        best_matches_subsets.append(best_match)
-
-    # Majority voting
-    cn = Counter([x["cell_type"] for x in best_matches_subsets])
-    best_match_subset = {
-        "cell_type": cn.most_common(1)[0][0],
-        "confidence": np.round(cn.most_common(1)[0][1] / num_of_subsets, 3),
-    }
-    pbar.update(1)  # global variable
-    return (ii, best_match_subset)
-
-logger.info(
-    f"Starting parallel per cell calculation of distances."
-)
+logger.info(f"Starting parallel per cell calculation of distances.")
 pbar = tqdm(total=len(st_df))
 with mp.Pool(processes=num_cpus_used) as pool:
     assigned_types = pool.map(per_cell, iis)
@@ -247,69 +332,39 @@ assigned_types = [at[1] for at in assigned_types]
 end = time.time()
 logger.info(f"SSI execution took: {end - start}s")
 adata_st.obs["ssi"] = [x["cell_type"] for x in assigned_types]
-adata_st.obs['confidence'] = [x["confidence"] for x in assigned_types]
+adata_st.obs["confidence"] = [x["confidence"] for x in assigned_types]
 # sns.histplot([x["confidence"] for x in assigned_types])
 # plt.savefig(f"ssi_confidence_hist__{args.distance}.png", dpi=120, bbox_inches="tight")
 
 # Write CSV and H5AD
-adata_st.obs.index.name = 'cell_id'
-adata_st.obs[["ssi"]].to_csv(os.path.basename(args.st_path).replace(".h5ad", f"_ssi_{args.distance}.csv"))
-adata_st.write_h5ad(os.path.basename(args.st_path).replace(".h5ad", f"_ssi_{args.distance}.h5ad"))
+adata_st.obs.index.name = "cell_id"
+adata_st.obs[["ssi"]].to_csv(
+    os.path.basename(args.st_path).replace(".h5ad", f"_ssi_{args.distance}.csv")
+)
+adata_st.write_h5ad(
+    os.path.basename(args.st_path).replace(".h5ad", f"_ssi_{args.distance}.h5ad")
+)
 
-# Visualisation
-def plot_spatial(
-    adata, annotation, ax: plt.Axes, spot_size: float, palette=None, title: str = ""
-):
-    """
-    Scatter plot in spatial coordinates.
-
-    Parameters:
-        - adata (AnnData): Annotated data object which represents the sample
-        - annotation (str): adata.obs column used for grouping
-        - ax (Axes): Axes object used for plotting
-        - spot_size (int): Size of the dot that represents a cell. We are passing it as a diameter of the spot, while
-                the plotting library uses radius therefore it is multiplied by 0.5
-        - palette (dict): Dictionary that represents a mapping between annotation categories and colors
-        - title (str): Title of the figure
-
-    """
-    palette = sns.color_palette("coolwarm", as_cmap=True)
-    s = spot_size * 0.5
-    data = adata
-    ax = sns.scatterplot(
-        data=data.obs,
-        hue=annotation,
-        x=data.obsm["spatial"][:, 0],
-        y=data.obsm["spatial"][:, 1],
-        ax=ax,
-        s=s,
-        linewidth=0,
-        palette=palette if ('float' in str(type(adata.obs[annotation][0])).lower()) else None,
-        marker="."
-    )
-    ax.invert_yaxis()
-    ax.set(yticklabels=[], xticklabels=[], title=title)
-    ax.tick_params(bottom=False, left=False)
-    ax.set_aspect("equal")
-    sns.despine(bottom=True, left=True, ax=ax)
 
 if "spatial" in adata_st.obsm_keys():
     fig, axs = plt.subplots(1, 2, figsize=(14, 14))
     plot_spatial(
-        adata_st,
-        annotation=f"ssi",
-        spot_size=50,
-        ax=axs[0],
-        title="Cell types"
+        adata_st, annotation=f"ssi", spot_size=50, ax=axs[0], title="Cell types"
     )
     plot_spatial(
         adata_st,
         annotation=f"confidence",
         spot_size=50,
         ax=axs[1],
-        title="Confidence map"
+        title="Confidence map",
     )
-    plt.savefig(os.path.basename(args.st_path).replace(".h5ad", f"_ssi_{args.distance}.png"), dpi=120, bbox_inches="tight")
+    plt.savefig(
+        os.path.basename(args.st_path).replace(".h5ad", f"_ssi_{args.distance}.png"),
+        dpi=120,
+        bbox_inches="tight",
+    )
 
+if args.contrastive:
+    contrastive_proc.join()
 end = time.time()
 logger.info(f"Total execution time: {end - start}s")

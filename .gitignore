@@ -9,6 +9,11 @@ __pycache__/
 #local
 results/
 data/
+tensorboard/
+models/
+loss_curves/
+contrastive_res/
+logs/
 *.png
 
 # Distribution / packaging
