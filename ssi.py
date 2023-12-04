@@ -217,7 +217,15 @@ adata_st.var_names_make_unique()
 if args.contrastive:
     contrastive_proc = mp.Process(
         target=core.contrastive_process,
-        args=(adata_sc, adata_st, args.annotation, 5),
+        kwargs=dict(
+            adata_sc=adata_sc,
+            adata_st=adata_st,
+            annotation_sc=args.annotation,
+            epochs=50,
+            embedding_dim=32,
+            encoder_depth=4,
+            classifier_depth=2,
+        ),
         name="Contrastive process",
     )
     contrastive_proc.start()

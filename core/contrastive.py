@@ -10,6 +10,7 @@ import os
 from zoneinfo import ZoneInfo
 import sys
 
+
 import anndata as ad
 from matplotlib import pyplot as plt
 import numpy as np
@@ -46,7 +47,7 @@ logging.basicConfig(
     filename=f"logs/{timestamp}.log",
 )
 logger = logging.getLogger(__name__)
-logger.addHandler(logging.StreamHandler(sys.stdout))
+# logger.addHandler(logging.StreamHandler(sys.stdout))
 
 
 class CombinedLoss(nn.Module):
@@ -532,7 +533,7 @@ class ContrastiveEncoder(BaseEstimator, TransformerMixin):
 
             end = time.time()
             elapsed = end - start
-            print(f"Epoch {epoch} took {elapsed:.2f}s")
+            logger.info(f"Epoch {epoch} took {elapsed:.2f}s")
 
             avg_val_loss = avg_val_loss_contrastive + avg_val_loss_classification
             is_classification_loss_included = (
@@ -688,8 +689,6 @@ def subset_on_marker_genes_with_augmentation(adata_sc, adata_st, annotation_sc):
     if sum(adata_sc_augmented.X.sum(axis=1) == 0) > 0:
         logger.warning(f"Input contains cells with 0 expression")
 
-    logger.info("Performing normalization and ")
-
     return adata_sc_augmented, adata_st, markers_intersect
 
 
@@ -807,76 +806,4 @@ def contrastive_process(
     )
     logger.info(
         f"Saved ST prediction result in contrastive_res/contrastive_pred_{timestamp}.csv"
-    )
-
-
-if __name__ == "__main__":
-    parser = ap.ArgumentParser(
-        description="A script that trains a contrastive learning model and performs prediction on ST dataset."
-    )
-    parser.add_argument(
-        "--sc_path",
-        help="A single cell reference dataset used for training",
-        type=str,
-        required=True,
-    )
-    parser.add_argument(
-        "--st_path",
-        help="A spatially resolved dataset",
-        type=str,
-        required=False,
-    )
-    parser.add_argument(
-        "--epochs",
-        help="Number of epochs for training",
-        type=int,
-        default=50,
-        required=False,
-    )
-    parser.add_argument(
-        "--annotation_sc",
-        help="Annotation label for cell types of single cell dataset",
-        type=str,
-        required=False,
-        default="cell_subclass",
-    )
-    parser.add_argument(
-        "--to_predict",
-        help="Comma separated list of ST datasets to predict on using the trained model",
-        type=str,
-        required=False,
-        default="",
-    )
-    parser.add_argument(
-        "--embedding_dim",
-        help="Dimension of the embedding of the encoder",
-        type=int,
-        default=32,
-        required=False,
-    )
-    parser.add_argument(
-        "--encoder_depth",
-        help="Number of hidden layers inside encoder",
-        type=int,
-        default=4,
-        required=False,
-    )
-    parser.add_argument(
-        "--classifier_depth",
-        help="Number of hidden layers inside the classifier",
-        type=int,
-        default=2,
-        required=False,
-    )
-
-    args = parser.parse_args()
-
-    contrastive_process(
-        args.sc_path,
-        args.st_path,
-        args.annotation_sc,
-        args.epochs,
-        args.embedding_dim,
-        args.encoder_depth,
-        args.classifier_depth,
     )

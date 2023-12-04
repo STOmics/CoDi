@@ -2,7 +2,6 @@ import anndata as ad
 from scipy.sparse import csr_matrix
 import numpy as np
 import random
-from tqdm.auto import tqdm
 import pandas as pd
 
 
@@ -58,9 +57,7 @@ def augment_data(adata_sc: ad.AnnData, annotation: str, percentage: float):
     ind = 0
     genes = adata_sc.shape[1]
 
-    for new_size, original_size, label in tqdm(
-        resampling_class_size, desc="Augmentation: "
-    ):
+    for new_size, original_size, label in resampling_class_size:
         if new_size <= original_size:
             # take unique cells and mutate
             adata_single_ct = adata_sc[adata_sc.obs[annotation] == label, :]
