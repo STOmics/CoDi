@@ -11,7 +11,7 @@
     ],
     "hq_path": "/goofys/projects/SSI/datasets/4K/Mouse_brain_SC.h5ad",
     "annotation": "cell_subclass",
-    "command": "python ssi.py --sc_path hq_path --st_path lq_path -a annotation -d none --contrastive",
-    "command2": "python ssi.py --sc_path hq_path --st_path lq_path -a annotation",
-    "output_suffix": "contrastive"
+    "command2": "python CoDi.py --sc_path hq_path --st_path lq_path -a annotation -d none --contrastive",
+    "command": "python CoDi.py --sc_path hq_path --st_path lq_path -a annotation",
+    "output_suffix": "CoDi"
 }

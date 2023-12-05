@@ -16,7 +16,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-parser = ap.ArgumentParser(description="A script that performs SSI.")
+parser = ap.ArgumentParser(description="A script that calculates the preservance of marker genes in ST data.")
 parser.add_argument(
     "--sc_path", help="A single cell reference dataset", type=str, required=True
 )

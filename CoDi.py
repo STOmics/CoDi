@@ -20,7 +20,7 @@ from scipy.sparse import issparse
 import seaborn as sns
 from tqdm import tqdm
 
-import core
+# import core
 
 random.seed(3)
 
@@ -157,7 +157,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-parser = ap.ArgumentParser(description="A script that performs SSI.")
+parser = ap.ArgumentParser(description="A script that performs CoDi.")
 parser.add_argument(
     "--sc_path", help="A single cell reference dataset", type=str, required=True
 )
@@ -215,7 +215,10 @@ adata_st.var_names_make_unique()
 
 # Contrastive part
 if args.contrastive:
+    import core
+    
     queue = mp.Queue()
+
     contrastive_proc = mp.Process(
         target=core.contrastive_process,
         kwargs=dict(
@@ -355,36 +358,36 @@ with mp.Pool(processes=num_cpus_used) as pool:
 assigned_types.sort(key=lambda x: x[0])
 assigned_types = [at[1] for at in assigned_types]
 end = time.time()
-logger.info(f"SSI execution took: {end - start}s")
-adata_st.obs["ssi"] = [x["cell_type"] for x in assigned_types]
-adata_st.obs["confidence"] = [x["confidence"] for x in assigned_types]
+logger.info(f"CoDi execution took: {end - start}s")
+adata_st.obs["CoDi"] = [x["cell_type"] for x in assigned_types]
+adata_st.obs["confidence_dist"] = [x["confidence"] for x in assigned_types]
 # sns.histplot([x["confidence"] for x in assigned_types])
-# plt.savefig(f"ssi_confidence_hist__{args.distance}.png", dpi=120, bbox_inches="tight")
+# plt.savefig(f"CoDi_confidence_hist__{args.distance}.png", dpi=120, bbox_inches="tight")
 
 # Write CSV and H5AD
 adata_st.obs.index.name = "cell_id"
-adata_st.obs[["ssi"]].to_csv(
-    os.path.basename(args.st_path).replace(".h5ad", f"_ssi_{args.distance}.csv")
+adata_st.obs[["CoDi"]].to_csv(
+    os.path.basename(args.st_path).replace(".h5ad", f"_CoDi_{args.distance}.csv")
 )
 adata_st.write_h5ad(
-    os.path.basename(args.st_path).replace(".h5ad", f"_ssi_{args.distance}.h5ad")
+    os.path.basename(args.st_path).replace(".h5ad", f"_CoDi_{args.distance}.h5ad")
 )
 
 
 if "spatial" in adata_st.obsm_keys():
     fig, axs = plt.subplots(1, 2, figsize=(14, 14))
     plot_spatial(
-        adata_st, annotation=f"ssi", spot_size=50, ax=axs[0], title="Cell types"
+        adata_st, annotation=f"CoDi", spot_size=50, ax=axs[0], title="Cell types"
     )
     plot_spatial(
         adata_st,
-        annotation=f"confidence",
+        annotation=f"confidence_dist",
         spot_size=50,
         ax=axs[1],
         title="Confidence map",
     )
     plt.savefig(
-        os.path.basename(args.st_path).replace(".h5ad", f"_ssi_{args.distance}.png"),
+        os.path.basename(args.st_path).replace(".h5ad", f"_CoDi_{args.distance}.png"),
         dpi=120,
         bbox_inches="tight",
     )
