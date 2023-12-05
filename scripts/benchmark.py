@@ -3,11 +3,13 @@ import subprocess
 import json
 import sys
 import time
+import multiprocessing
 
 import scanpy as sc
 import pandas as pd
 from sklearn.metrics import accuracy_score, f1_score, confusion_matrix, roc_auc_score, roc_curve, auc
 
+os.environ['NUMEXPR_MAX_THREADS'] = str(multiprocessing.cpu_count())
 
 # Check if input JSON exists and read it
 try:
@@ -62,11 +64,11 @@ for lq_path in lq_paths:
             distance_metric = "KLD"
         lq_path_pred = os.path.basename(lq_path).replace(".h5ad", f"_{algo_suffix}_{distance_metric}.h5ad")
         subsample_factor_pos = -3
-        out_file_name = f"../test/benchmark_{algo_suffix}_{distance_metric}.csv"
+        out_file_name = f"{sys.argv[1].split('.')[0]}_benchmark_{algo_suffix}_{distance_metric}.csv"
     else:
         lq_path_pred = os.path.basename(lq_path).replace(".h5ad", f"_{algo_suffix}.h5ad")
         subsample_factor_pos = -2
-        out_file_name = f"../test/benchmark_{algo_suffix}.csv"
+        out_file_name = f"{sys.argv[1].split('.')[0]}_benchmark_{algo_suffix}.csv"
     if not os.path.exists(lq_path_pred):
         return_code = subprocess.call(command.split(" "))
     adata_st = sc.read_h5ad(lq_path_pred)
@@ -80,3 +82,6 @@ out_df = out_df.reset_index(drop=True)
 out_df.to_csv(out_file_name)
 end = time.time()
 print(f"benchmark.py took: {end-start}s")
+with open(os.path.basename(out_file_name).replace(".csv", ".txt"), "w") as text_file:
+    text_file.write(f"benchmark.py took: {end-start}s")
+
