@@ -218,6 +218,8 @@ if args.contrastive:
     contrastive_proc = mp.Process(
         target=core.contrastive_process,
         kwargs=dict(
+            sc_path=args.sc_path,
+            st_path=args.st_path,
             adata_sc=adata_sc,
             adata_st=adata_st,
             annotation_sc=args.annotation,

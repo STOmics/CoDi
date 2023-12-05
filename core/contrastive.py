@@ -712,8 +712,10 @@ def plot_loss_curve(ce, path):
 
 
 def contrastive_process(
-    adata_sc: str | ad.AnnData,
-    adata_st: str | ad.AnnData,
+    sc_path: str,
+    st_path: str,
+    adata_sc: ad.AnnData,
+    adata_st: ad.AnnData,
     annotation_sc: str,
     epochs: int = 50,
     embedding_dim: int = 32,
@@ -721,16 +723,6 @@ def contrastive_process(
     classifier_depth: int = 2,
 ):
     fix_seed(0)
-
-    if type(adata_sc) is str:
-        adata_sc = sc.read(adata_sc)
-        adata_sc.var_names_make_unique()
-        logger.info("Loaded SC data...")
-
-    if type(adata_st) is str:
-        adata_st = sc.read(adata_st)
-        adata_st.var_names_make_unique()
-        logger.info("Loaded ST data...")
 
     adata_sc.obs_names_make_unique()
     adata_st.obs_names_make_unique()
@@ -801,8 +793,12 @@ def contrastive_process(
         logger.info(f"Converted gene exp matrix of ST to csr_matrix")
     y_pred = ce.predict(adata_st.X.toarray())
     adata_st.obs["contrastive"] = le.inverse_transform(y_pred)
+    adata_st.obs.index.name = "cell_id"
     adata_st.obs["contrastive"].to_csv(
-        f"contrastive_res/contrastive_pred_{timestamp}.csv"
+        os.path.basename(st_path).replace(".h5ad", f"_contrastive.csv")
+    )
+    adata_st.write_h5ad(
+        os.path.basename(st_path).replace(".h5ad", f"_contrastive.h5ad")
     )
     logger.info(
         f"Saved ST prediction result in contrastive_res/contrastive_pred_{timestamp}.csv"
