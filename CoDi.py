@@ -20,7 +20,7 @@ from scipy.sparse import issparse
 import seaborn as sns
 from tqdm import tqdm
 
-import core
+# import core
 
 random.seed(3)
 
@@ -108,6 +108,7 @@ def per_cell(ii):
     best_match_subset = {
         "cell_type": cn.most_common(1)[0][0],
         "confidence": np.round(cn.most_common(1)[0][1] / num_of_subsets, 3),
+        "ct_probabilities": [np.round(cn[cellt]/num_of_subsets, 3) if cellt in cn.keys() else 0.0 for cellt in adata_st.obsm['probabilities_dist'].columns],
     }
     pbar.update(1)  # global variable
     return (ii, best_match_subset)
@@ -157,7 +158,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-parser = ap.ArgumentParser(description="A script that performs SSI.")
+parser = ap.ArgumentParser(description="A script that performs CoDi.")
 parser.add_argument(
     "--sc_path", help="A single cell reference dataset", type=str, required=True
 )
@@ -215,7 +216,10 @@ adata_st.var_names_make_unique()
 
 # Contrastive part
 if args.contrastive:
+    import core
+    
     queue = mp.Queue()
+
     contrastive_proc = mp.Process(
         target=core.contrastive_process,
         kwargs=dict(
@@ -311,6 +315,7 @@ select_ind = [np.where(adata_st.var.index == gene)[0][0] for gene in markers_int
 st_df = adata_st.X.tocsr()[:, select_ind].todense() if issparse(adata_st.X) else adata_st.X[:, select_ind]
 st_df = pd.DataFrame(st_df, columns=markers_intersect, index=adata_st.obs.index)
 cell_types = set(adata_sc.obs[args.annotation])
+adata_st.obsm['probabilities_dist'] = pd.DataFrame(index=adata_st.obs.index, columns=cell_types)
 
 # Algo
 # *****************************************
@@ -346,7 +351,6 @@ assigned_types = []
 
 iis = [ii for ii in range(len(st_df))]
 
-
 logger.info(f"Starting parallel per cell calculation of distances.")
 pbar = tqdm(total=len(st_df))
 with mp.Pool(processes=num_cpus_used) as pool:
@@ -354,56 +358,70 @@ with mp.Pool(processes=num_cpus_used) as pool:
 
 assigned_types.sort(key=lambda x: x[0])
 assigned_types = [at[1] for at in assigned_types]
-end = time.time()
-logger.info(f"SSI execution took: {end - start}s")
-adata_st.obs["ssi"] = [x["cell_type"] for x in assigned_types]
-adata_st.obs["confidence"] = [x["confidence"] for x in assigned_types]
+adata_st.obs["CoDi_dist"] = [x["cell_type"] for x in assigned_types]
+adata_st.obs["confidence_dist"] = [x["confidence"] for x in assigned_types]
+adata_st.obsm['probabilities_dist'].iloc[:, :] = [x["ct_probabilities"] for x in assigned_types]
+
 # sns.histplot([x["confidence"] for x in assigned_types])
-# plt.savefig(f"ssi_confidence_hist__{args.distance}.png", dpi=120, bbox_inches="tight")
-
-# Write CSV and H5AD
-adata_st.obs.index.name = "cell_id"
-adata_st.obs[["ssi"]].to_csv(
-    os.path.basename(args.st_path).replace(".h5ad", f"_ssi_{args.distance}.csv")
-)
-adata_st.write_h5ad(
-    os.path.basename(args.st_path).replace(".h5ad", f"_ssi_{args.distance}.h5ad")
-)
-
-
-if "spatial" in adata_st.obsm_keys():
-    fig, axs = plt.subplots(1, 2, figsize=(14, 14))
-    plot_spatial(
-        adata_st, annotation=f"ssi", spot_size=50, ax=axs[0], title="Cell types"
-    )
-    plot_spatial(
-        adata_st,
-        annotation=f"confidence",
-        spot_size=50,
-        ax=axs[1],
-        title="Confidence map",
-    )
-    plt.savefig(
-        os.path.basename(args.st_path).replace(".h5ad", f"_ssi_{args.distance}.png"),
-        dpi=120,
-        bbox_inches="tight",
-    )
+# plt.savefig(f"CoDi_confidence_hist__{args.distance}.png", dpi=120, bbox_inches="tight")
 
 if args.contrastive:
     df_probabilities = queue.get()  # FIFO (ordering in contrastive.py)
     adata_st.obsm["probabilities_contrastive"] = df_probabilities
     predictions = queue.get()
-    adata_st.obs["pred_contrastive"] = predictions
+    adata_st.obs["CoDi_contrastive"] = predictions
     contrastive_proc.join()
-    # Write CSV and H5AD
-    adata_st.obs.index.name = "cell_id"
-    adata_st.obs["pred_contrastive"].to_csv(
-        os.path.basename(args.st_path).replace(
-            ".h5ad", f"_contrastive_{args.distance}.csv"
-        )
-    )
-    adata_st.write_h5ad(
-        os.path.basename(args.st_path).replace(".h5ad", f"_ssi_{args.distance}.h5ad")
-    )
+
+# combine contrastive and distance results
+dist_weight = 0.5
+if args.contrastive:
+    if 'probabilities_contrastive' not in adata_st.obsm_keys:
+        raise ValueError("Missing 'probabilities_contrastive' in adata_st.obsm.")
+    else:
+        adata_st.obsm['probabilities'] = adata_st.obsm['probabilities_contrastive'].add(adata_st.obsm['probabilities_dist'] * dist_weight)
+        adata_st.obs['CoDi'] = np.array([prow.idxmax(axis=1) for _, prow in adata_st.obsm['probabilities'].iterrows()]).astype('str')
+else:
+    adata_st.obs['CoDi'] = adata_st.obs['CoDi_dist']
+
 end = time.time()
-logger.info(f"Total execution time: {end - start}s")
+logger.info(
+    f"CoDi execution took: {end - start}s"
+    )
+
+# Write CSV and H5AD
+adata_st.obs.index.name = "cell_id"
+if args.contrastive:
+    # Write CSV of contrastive results
+    adata_st.obs["CoDi_contrastive"].to_csv(
+        os.path.basename(args.st_path).replace(".h5ad", "_contrastive.csv")
+    )
+# Write CSV and H5AD of final combined results
+adata_st.obs[["CoDi"]].to_csv(
+    os.path.basename(args.st_path).replace(".h5ad", f"_CoDi_{args.distance}.csv")
+)
+adata_st.write_h5ad(
+    os.path.basename(args.st_path).replace(".h5ad", f"_CoDi_{args.distance}.h5ad")
+)
+
+if "spatial" in adata_st.obsm_keys():
+    fig, axs = plt.subplots(1, 2, figsize=(14, 14))
+    plot_spatial(
+        adata_st, annotation=f"CoDi", spot_size=50, ax=axs[0], title="Cell types"
+    )
+    plot_spatial(
+        adata_st,
+        annotation=f"confidence_dist",
+        spot_size=50,
+        ax=axs[1],
+        title="Confidence map",
+    )
+    plt.savefig(
+        os.path.basename(args.st_path).replace(".h5ad", f"_CoDi_{args.distance}.png"),
+        dpi=120,
+        bbox_inches="tight",
+    )
+
+end = time.time()
+logger.info(
+    f"Total execution time: {end - start}s"
+    )

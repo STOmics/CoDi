@@ -69,7 +69,7 @@ for lq_path in lq_paths:
         .replace("annotation", annotation)
     )
     command_split = command.split(" ")
-    if algo_suffix == "ssi":
+    if algo_suffix == "CoDi":
         if "-d" in command_split:
             distance_metric = command_split[
                 [h for h, value in enumerate(command_split) if value == "-d"][0] + 1
