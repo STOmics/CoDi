@@ -411,7 +411,7 @@ class ContrastiveEncoder(BaseEstimator, TransformerMixin):
 
         best_val_loss = float("inf")
         no_improvement_count = 0
-        PATIENCE = 10
+        PATIENCE = 5
 
         # scaler = GradScaler()
 
