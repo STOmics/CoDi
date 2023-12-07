@@ -264,16 +264,14 @@ if args.distance == "none":
 # sc.pp.filter_genes(adata_st, min_cells=5)
 
 # Read datasets and check if matrix is sparse
-sc_df_raw = pd.DataFrame(
-    adata_sc.X.toarray() if issparse(adata_sc.X) else adata_sc.X,
-    index=adata_sc.obs.index,
-    columns=adata_sc.var.index,
-).copy()
-st_df_raw = pd.DataFrame(
-    adata_st.X.toarray() if issparse(adata_st.X) else adata_st.X,
-    index=adata_st.obs.index,
-    columns=adata_st.var.index,
-).copy()
+# sc_df_raw = pd.DataFrame(
+#     adata_sc.X.toarray() if issparse(adata_sc.X) else adata_sc.X,
+#     index=adata_sc.obs.index, columns=adata_sc.var.index
+# ).copy()
+# st_df_raw = pd.DataFrame(
+#     adata_st.X.toarray() if issparse(adata_st.X) else adata_st.X,
+#     index=adata_st.obs.index, columns=adata_st.var.index
+# ).copy()
 
 # Calculate marker genes
 start_marker = time.time()
@@ -301,15 +299,22 @@ logger.info(
 )
 end_marker = time.time()
 marker_time = np.round(end_marker - start_marker, 3)
-logger.info(f"Calculation of marker genes took {marker_time}")
-sc_df = sc_df_raw.loc[:, markers_intersect]
-st_df = st_df_raw.loc[:, markers_intersect]
-cell_types = set(adata_sc.obs[args.annotation])
+logger.info(
+    f"Calculation of marker genes took {marker_time}"
+)
 
+# Extract gene expressions only from marker genes
+select_ind = [np.where(adata_sc.var.index == gene)[0][0] for gene in markers_intersect]
+sc_df = adata_sc.X.tocsr()[:, select_ind].todense() if issparse(adata_sc.X) else adata_sc.X[:, select_ind]
+sc_df = pd.DataFrame(sc_df, columns=markers_intersect, index=adata_sc.obs.index)
+select_ind = [np.where(adata_st.var.index == gene)[0][0] for gene in markers_intersect]
+st_df = adata_st.X.tocsr()[:, select_ind].todense() if issparse(adata_st.X) else adata_st.X[:, select_ind]
+st_df = pd.DataFrame(st_df, columns=markers_intersect, index=adata_st.obs.index)
+cell_types = set(adata_sc.obs[args.annotation])
 
 # Algo
 # *****************************************
-# Precalculate inverse covariance matrices
+# Precalculate necessary subset matrices
 # *****************************************
 # sc_dfs = {}
 sc_icms = {}
