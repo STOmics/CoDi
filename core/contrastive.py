@@ -26,7 +26,7 @@ from torch.nn.functional import cosine_similarity
 import torch.nn.functional as F
 from torch.utils.data import Dataset
 from torch.cuda.amp import GradScaler
-from torch.optim import Adam
+from torch.optim import Adam, SGD
 from torch.utils.data import DataLoader
 from tqdm.auto import tqdm
 from sklearn.metrics import accuracy_score, f1_score
@@ -331,6 +331,7 @@ class ContrastiveEncoder(BaseEstimator, TransformerMixin):
         self.train_loss_history_classification = []
         self.val_loss_history_contrastive = []
         self.val_loss_history_classification = []
+        self.sum_loss = []
 
     def fit(self, X: np.ndarray, y: Optional[np.ndarray] = None):
         """Instantiate and train DeepEncoder that will try to minimize the loss between anchor and positive view
@@ -397,16 +398,20 @@ class ContrastiveEncoder(BaseEstimator, TransformerMixin):
         ]
 
         optimizer = Adam(params)
-        combined_loss = CombinedLoss(class_weights=self.class_weights).to(self.device)
+        # optimizer = SGD(params, weight_decay=0.1)
+        combined_loss = CombinedLoss(
+            class_weights=self.class_weights, temperature=0.5
+        ).to(self.device)
 
         train_loss_history_contrastive = []
         train_loss_history_classification = []
         val_loss_history_contrastive = []
         val_loss_history_classification = []
+        sum_loss = []
 
         best_val_loss = float("inf")
         no_improvement_count = 0
-        PATIENCE = 5
+        PATIENCE = 10
 
         # scaler = GradScaler()
 
@@ -524,6 +529,8 @@ class ContrastiveEncoder(BaseEstimator, TransformerMixin):
             train_loss_history_contrastive.append(avg_train_loss_contrastive)
             train_loss_history_classification.append(avg_train_loss_classification)
 
+            sum_loss.append(avg_train_loss_contrastive + avg_train_loss_classification)
+
             avg_val_loss_contrastive = val_loss_contrastive / len(val_loader.dataset)
             avg_val_loss_classification = val_loss_classification / len(
                 val_loader.dataset
@@ -556,6 +563,7 @@ class ContrastiveEncoder(BaseEstimator, TransformerMixin):
         self.train_loss_history_classification = train_loss_history_classification
         self.val_loss_history_contrastive = val_loss_history_contrastive
         self.val_loss_history_classification = val_loss_history_classification
+        self.sum_loss = sum_loss
         return self
 
     def load_model(self, path: str):
@@ -611,12 +619,7 @@ class ContrastiveEncoder(BaseEstimator, TransformerMixin):
 
     def predict_proba(self, X: np.ndarray, y: Optional[np.ndarray] = None):
         preds = self._transform_or_predict(self.model.get_log_reg, X, y)
-        preds = np.array(
-            [x[0] if isinstance(x, (list, tuple, np.ndarray)) else x for x in preds]
-        )
-        preds_0 = np.array([1 - x for x in preds])
-        preds = np.vstack([preds_0, preds]).T
-        return preds
+        return preds.cpu().numpy()
 
     def transform(self, X: np.ndarray, y: Optional[np.ndarray] = None):
         return self._transform_or_predict(self.model.get_embeddings, X, y)
@@ -680,7 +683,7 @@ def subset_on_marker_genes_with_augmentation(adata_sc, adata_st, annotation_sc):
     adata_sc = adata_sc[:, markers_intersect]
 
     adata_sc_augmented = augment_data(
-        adata_sc, annotation=annotation_sc, percentage=0.4
+        adata_sc, annotation=annotation_sc, percentage=0.7
     )
     logger.info(
         f"Augmentation and rebalancing created new anndata object of shape: {adata_sc_augmented.shape} compared to old shape: {adata_sc.shape}"
@@ -708,6 +711,15 @@ def plot_loss_curve(ce, path):
     axs[1].set_xlabel("epoch")
     plt.tight_layout()
     plt.savefig(path)
+
+    fig, ax = plt.subplots()
+    ax.plot(ce.sum_loss, color="black")
+    ax.set_ylabel("loss")
+    ax.set_xlabel("epoch")
+    ax.set_frame_on(False)
+    plt.tight_layout()
+    plt.savefig(f"loss_curves/total_loss_size_{timestamp}.png")
+
     logger.info(f"Saved the loss curves .png to {path}")
 
 
@@ -721,6 +733,7 @@ def contrastive_process(
     embedding_dim: int = 32,
     encoder_depth: int = 4,
     classifier_depth: int = 2,
+    queue=None,
 ):
     fix_seed(0)
 
@@ -774,6 +787,7 @@ def contrastive_process(
     )
 
     y_pred = ce.predict(X_test)
+
     y_true = y_test
     acc = accuracy_score(le.inverse_transform(y_true), le.inverse_transform(y_pred))
     f1 = f1_score(
@@ -797,9 +811,10 @@ def contrastive_process(
     adata_st.obs["contrastive"].to_csv(
         os.path.basename(st_path).replace(".h5ad", f"_contrastive.csv")
     )
-    adata_st.write_h5ad(
-        os.path.basename(st_path).replace(".h5ad", f"_contrastive.h5ad")
+    probabilities = ce.predict_proba(adata_st.X.toarray())
+    df_probabilities = pd.DataFrame(
+        data=probabilities, columns=le.classes_, index=adata_st.obs.index
     )
-    logger.info(
-        f"Saved ST prediction result in contrastive_res/contrastive_pred_{timestamp}.csv"
-    )
+    if queue:
+        queue.put(df_probabilities)
+        queue.put(adata_st.obs["contrastive"])

@@ -215,6 +215,7 @@ adata_st.var_names_make_unique()
 
 # Contrastive part
 if args.contrastive:
+    queue = mp.Queue()
     contrastive_proc = mp.Process(
         target=core.contrastive_process,
         kwargs=dict(
@@ -227,6 +228,7 @@ if args.contrastive:
             embedding_dim=32,
             encoder_depth=4,
             classifier_depth=2,
+            queue=queue,
         ),
         name="Contrastive process",
     )
@@ -235,7 +237,23 @@ if args.contrastive:
 
 if args.distance == "none":
     if args.contrastive:
+        df_probabilities = queue.get()  # FIFO (ordering in contrastive.py)
+        adata_st.obsm["probabilities_contrastive"] = df_probabilities
+        predictions = queue.get()
+        adata_st.obs["pred_contrastive"] = predictions
         contrastive_proc.join()
+        # Write CSV and H5AD
+        adata_st.obs.index.name = "cell_id"
+        adata_st.obs["pred_contrastive"].to_csv(
+            os.path.basename(args.st_path).replace(
+                ".h5ad", f"_contrastive_{args.distance}.csv"
+            )
+        )
+        adata_st.write_h5ad(
+            os.path.basename(args.st_path).replace(
+                ".h5ad", f"_ssi_{args.distance}.h5ad"
+            )
+        )
     logger.info(f"No distance metric specified, exiting...")
     sys.exit()
 
@@ -367,6 +385,20 @@ if "spatial" in adata_st.obsm_keys():
     )
 
 if args.contrastive:
+    df_probabilities = queue.get()  # FIFO (ordering in contrastive.py)
+    adata_st.obsm["probabilities_contrastive"] = df_probabilities
+    predictions = queue.get()
+    adata_st.obs["pred_contrastive"] = predictions
     contrastive_proc.join()
+    # Write CSV and H5AD
+    adata_st.obs.index.name = "cell_id"
+    adata_st.obs["pred_contrastive"].to_csv(
+        os.path.basename(args.st_path).replace(
+            ".h5ad", f"_contrastive_{args.distance}.csv"
+        )
+    )
+    adata_st.write_h5ad(
+        os.path.basename(args.st_path).replace(".h5ad", f"_ssi_{args.distance}.h5ad")
+    )
 end = time.time()
 logger.info(f"Total execution time: {end - start}s")
