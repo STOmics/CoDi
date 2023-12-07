@@ -1,6 +1,6 @@
 {
     "lq_paths": [
-            "/goofys/projects/SSI/datasets/mouse_brain_visium_cell2location/sc_raw.h5ad",
+            "/goofys/projects/SSI/datasets/mouse_brain_visium_cell2location/synthetic_sc.h5ad",
             "/goofys/projects/SSI/datasets/mouse_brain_visium_cell2location/synthetic_sc_0.05.h5ad",
             "/goofys/projects/SSI/datasets/mouse_brain_visium_cell2location/synthetic_sc_0.1.h5ad",
             "/goofys/projects/SSI/datasets/mouse_brain_visium_cell2location/synthetic_sc_0.2.h5ad",
