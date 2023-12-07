@@ -374,12 +374,10 @@ if args.contrastive:
 
 # combine contrastive and distance results
 dist_weight = 0.5
-if args.contrastive:
-    if 'probabilities_contrastive' not in adata_st.obsm_keys:
-        raise ValueError("Missing 'probabilities_contrastive' in adata_st.obsm.")
-    else:
-        adata_st.obsm['probabilities'] = adata_st.obsm['probabilities_contrastive'].add(adata_st.obsm['probabilities_dist'] * dist_weight)
-        adata_st.obs['CoDi'] = np.array([prow.idxmax(axis=1) for _, prow in adata_st.obsm['probabilities'].iterrows()]).astype('str')
+if not args.contrastive:
+    assert 'probabilities_contrastive' in adata_st.obsm, "Missing 'probabilities_contrastive' in adata_st.obsm."
+    adata_st.obsm['probabilities'] = adata_st.obsm['probabilities_contrastive'].add(adata_st.obsm['probabilities_dist'] * dist_weight)
+    adata_st.obs['CoDi'] = np.array([prow.idxmax(axis=1) for _, prow in adata_st.obsm['probabilities'].iterrows()]).astype('str') 
 else:
     adata_st.obs['CoDi'] = adata_st.obs['CoDi_dist']
 
