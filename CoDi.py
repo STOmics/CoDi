@@ -314,8 +314,8 @@ sc_df = pd.DataFrame(sc_df, columns=markers_intersect, index=adata_sc.obs.index)
 select_ind = [np.where(adata_st.var.index == gene)[0][0] for gene in markers_intersect]
 st_df = adata_st.X.tocsr()[:, select_ind].todense() if issparse(adata_st.X) else adata_st.X[:, select_ind]
 st_df = pd.DataFrame(st_df, columns=markers_intersect, index=adata_st.obs.index)
-cell_types = set(adata_sc.obs[args.annotation])
-adata_st.obsm['probabilities_dist'] = pd.DataFrame(index=adata_st.obs.index, columns=cell_types)
+cell_types = list(sorted(adata_sc.obs[args.annotation].unique()))
+adata_st.obsm['probabilities_dist'] = pd.DataFrame(index=adata_st.obs.index, columns=cell_types).astype('float32')
 
 # Algo
 # *****************************************
