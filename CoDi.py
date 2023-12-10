@@ -21,6 +21,7 @@ import seaborn as sns
 from tqdm import tqdm
 
 # import core
+from core import preprocess
 
 random.seed(3)
 
@@ -108,7 +109,10 @@ def per_cell(ii):
     best_match_subset = {
         "cell_type": cn.most_common(1)[0][0],
         "confidence": np.round(cn.most_common(1)[0][1] / num_of_subsets, 3),
-        "ct_probabilities": [np.round(cn[cellt]/num_of_subsets, 3) if cellt in cn.keys() else 0.0 for cellt in adata_st.obsm['probabilities_dist'].columns],
+        "ct_probabilities": [
+            np.round(cn[cellt] / num_of_subsets, 3) if cellt in cn.keys() else 0.0
+            for cellt in adata_st.obsm["probabilities_dist"].columns
+        ],
     }
     pbar.update(1)  # global variable
     return (ii, best_match_subset)
@@ -213,11 +217,13 @@ adata_sc = sc.read_h5ad(args.sc_path)
 adata_st = sc.read_h5ad(args.st_path)
 adata_sc.var_names_make_unique()
 adata_st.var_names_make_unique()
+preprocess(adata_sc)
+preprocess(adata_st)
 
 # Contrastive part
 if args.contrastive:
     import core
-    
+
     queue = mp.Queue()
 
     contrastive_proc = mp.Process(
@@ -303,19 +309,27 @@ logger.info(
 )
 end_marker = time.time()
 marker_time = np.round(end_marker - start_marker, 3)
-logger.info(
-    f"Calculation of marker genes took {marker_time}"
-)
+logger.info(f"Calculation of marker genes took {marker_time}")
 
 # Extract gene expressions only from marker genes
 select_ind = [np.where(adata_sc.var.index == gene)[0][0] for gene in markers_intersect]
-sc_df = adata_sc.X.tocsr()[:, select_ind].todense() if issparse(adata_sc.X) else adata_sc.X[:, select_ind]
+sc_df = (
+    adata_sc.X.tocsr()[:, select_ind].todense()
+    if issparse(adata_sc.X)
+    else adata_sc.X[:, select_ind]
+)
 sc_df = pd.DataFrame(sc_df, columns=markers_intersect, index=adata_sc.obs.index)
 select_ind = [np.where(adata_st.var.index == gene)[0][0] for gene in markers_intersect]
-st_df = adata_st.X.tocsr()[:, select_ind].todense() if issparse(adata_st.X) else adata_st.X[:, select_ind]
+st_df = (
+    adata_st.X.tocsr()[:, select_ind].todense()
+    if issparse(adata_st.X)
+    else adata_st.X[:, select_ind]
+)
 st_df = pd.DataFrame(st_df, columns=markers_intersect, index=adata_st.obs.index)
-cell_types = set(adata_sc.obs[args.annotation])
-adata_st.obsm['probabilities_dist'] = pd.DataFrame(index=adata_st.obs.index, columns=cell_types)
+cell_types = np.array(sorted(adata_sc.obs[args.annotation].unique())).astype("str")
+adata_st.obsm["probabilities_dist"] = pd.DataFrame(
+    index=adata_st.obs.index, columns=cell_types
+).astype("float32")
 
 # Algo
 # *****************************************
@@ -360,7 +374,9 @@ assigned_types.sort(key=lambda x: x[0])
 assigned_types = [at[1] for at in assigned_types]
 adata_st.obs["CoDi_dist"] = [x["cell_type"] for x in assigned_types]
 adata_st.obs["confidence_dist"] = [x["confidence"] for x in assigned_types]
-adata_st.obsm['probabilities_dist'].iloc[:, :] = [x["ct_probabilities"] for x in assigned_types]
+adata_st.obsm["probabilities_dist"].iloc[:, :] = [
+    x["ct_probabilities"] for x in assigned_types
+]
 
 # sns.histplot([x["confidence"] for x in assigned_types])
 # plt.savefig(f"CoDi_confidence_hist__{args.distance}.png", dpi=120, bbox_inches="tight")
@@ -375,16 +391,20 @@ if args.contrastive:
 # combine contrastive and distance results
 dist_weight = 0.5
 if args.contrastive:
-    assert 'probabilities_contrastive' in adata_st.obsm, "Missing 'probabilities_contrastive' in adata_st.obsm."
-    adata_st.obsm['probabilities'] = adata_st.obsm['probabilities_contrastive'].add(adata_st.obsm['probabilities_dist'] * dist_weight)
-    adata_st.obs['CoDi'] = np.array([prow.idxmax(axis=1) for _, prow in adata_st.obsm['probabilities'].iterrows()]).astype('str') 
+    assert (
+        "probabilities_contrastive" in adata_st.obsm
+    ), "Missing 'probabilities_contrastive' in adata_st.obsm."
+    adata_st.obsm["probabilities"] = adata_st.obsm["probabilities_contrastive"].add(
+        adata_st.obsm["probabilities_dist"] * dist_weight
+    )
+    adata_st.obs["CoDi"] = np.array(
+        [prow.idxmax(axis=1) for _, prow in adata_st.obsm["probabilities"].iterrows()]
+    ).astype("str")
 else:
-    adata_st.obs['CoDi'] = adata_st.obs['CoDi_dist']
+    adata_st.obs["CoDi"] = adata_st.obs["CoDi_dist"]
 
 end = time.time()
-logger.info(
-    f"CoDi execution took: {end - start}s"
-    )
+logger.info(f"CoDi execution took: {end - start}s")
 
 # Write CSV and H5AD
 adata_st.obs.index.name = "cell_id"
@@ -420,6 +440,4 @@ if "spatial" in adata_st.obsm_keys():
     )
 
 end = time.time()
-logger.info(
-    f"Total execution time: {end - start}s"
-    )
+logger.info(f"Total execution time: {end - start}s")
