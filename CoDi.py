@@ -393,7 +393,7 @@ if args.contrastive:
         adata_st.obsm["probabilities_dist"] * dist_weight
     )
     adata_st.obs["CoDi"] = np.array(
-        [prow.idxmax(axis=1) for _, prow in adata_st.obsm["probabilities"].iterrows()]
+        [prow.idxmax() for _, prow in adata_st.obsm["probabilities"].iterrows()]
     ).astype("str")
 else:
     adata_st.obs["CoDi"] = adata_st.obs["CoDi_dist"]
