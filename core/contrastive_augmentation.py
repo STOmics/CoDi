@@ -46,13 +46,20 @@ def augment_data(adata_sc: ad.AnnData, annotation: str, percentage: float):
         zip(normalized_counts_per_ct, counts_per_ct, cts)
     )  # (new, original, cell_type)
 
+    total_old_cells = sum(counts_per_ct)
     total_new_cells = sum(normalized_counts_per_ct)
+    scaling_factor = total_old_cells / total_new_cells
+    resampling_class_size = [
+        (int(new_size * scaling_factor), original_size, label)
+        for new_size, original_size, label in resampling_class_size
+    ]
     genes = adata_sc.shape[1]
-    counts = np.zeros((total_new_cells, genes), dtype=np.int16)
+    scaled_total_new_cells = sum(x[0] for x in resampling_class_size)
+    counts = np.zeros((scaled_total_new_cells, genes), dtype=np.int16)
 
     new_adata = ad.AnnData(counts)
     new_adata.var_names = adata_sc.var_names
-    new_adata.obs[annotation] = pd.Series(np.empty(total_new_cells), dtype=str)
+    new_adata.obs[annotation] = pd.Series(np.empty(scaled_total_new_cells), dtype=str)
 
     ind = 0
     genes = adata_sc.shape[1]
@@ -90,17 +97,5 @@ def augment_data(adata_sc: ad.AnnData, annotation: str, percentage: float):
 
     new_adata.obs[annotation] = new_adata.obs[annotation].astype("category")
     new_adata.X = csr_matrix(new_adata.X)
-
-    # perform some basic testing to confirm that number of
-    # genes with non-zero counts decreased in augmented dataset
-    # cnt_new = 0
-    # cnt_old = 0
-    # for i in range(adata_sc.shape[0]):
-    #     cnt_old += len(np.nonzero(adata_sc[i].X)[1])
-    # for i in range(new_adata.shape[0]):
-    #     cnt_new += len(np.nonzero(new_adata[i].X)[1])
-
-    # print("avg non-zero count in original", cnt_old / adata_sc.shape[0])
-    # print("avg non-zero count in augmented", cnt_new / new_adata.shape[0])
 
     return new_adata

@@ -31,7 +31,8 @@ from torch.utils.data import DataLoader
 from tqdm.auto import tqdm
 from sklearn.metrics import accuracy_score, f1_score
 
-from .contrastive_augmentation import augment_data
+from core.contrastive_augmentation import augment_data
+from core.preprocessing import preprocess
 
 dirs = ["logs", "loss_curves", "contrastive_res", "models"]
 for d in dirs:
@@ -140,7 +141,7 @@ class MLP(torch.nn.Sequential):
             layers.append(torch.nn.Linear(in_dim, hidden_dim_size))
             # added batch norm before activation func.: https://arxiv.org/abs/1502.03167
             layers.append(torch.nn.BatchNorm1d(hidden_dim_size))
-            layers.append(nn.ReLU(inplace=True))
+            layers.append(nn.PReLU())
             layers.append(torch.nn.Dropout(dropout))
             in_dim = hidden_dim_size
 
@@ -411,7 +412,7 @@ class ContrastiveEncoder(BaseEstimator, TransformerMixin):
 
         best_val_loss = float("inf")
         no_improvement_count = 0
-        PATIENCE = 10
+        PATIENCE = 5
 
         # scaler = GradScaler()
 
@@ -554,6 +555,7 @@ class ContrastiveEncoder(BaseEstimator, TransformerMixin):
                     no_improvement_count += 1
 
                 if no_improvement_count >= PATIENCE:
+                    # pass
                     logger.info(
                         f"Early stopping after {epoch+1} epochs without improvement."
                     )
@@ -647,54 +649,6 @@ def fix_seed(seed):
     torch.cuda.manual_seed(seed)
 
 
-def subset_on_marker_genes_with_augmentation(adata_sc, adata_st, annotation_sc):
-    """Calculates marker genes
-
-    Get marker genes on SC dataset by taking the first 100 markers for each cell type and then
-    create intersection of those grouped genes with genes in ST dataset.
-
-    Args:
-        adata_sc (_type_): _description_
-        adata_st (_type_): _description_
-
-    Returns:
-        _type_: _description_
-    """
-    adata_sc.layers["counts"] = adata_sc.X.copy()
-    # adata_sc_augmented = augment_data(
-    #     adata_sc, annotation=args.annotation, percentage=0.4
-    # )
-    # Calculate marker genes
-    sc.pp.normalize_total(adata_sc, target_sum=1e4)
-    sc.pp.log1p(adata_sc)
-    adata_sc.var_names_make_unique()
-    sc.tl.rank_genes_groups(adata_sc, groupby=annotation_sc, use_raw=False)
-
-    markers_df = pd.DataFrame(adata_sc.uns["rank_genes_groups"]["names"]).iloc[0:100, :]
-    markers = list(np.unique(markers_df.melt().value.values))
-
-    markers_intersect = list(set(markers).intersection(adata_st.var.index))
-    logger.info(
-        "Found intersecting marker genes, performed intersection on ST and SC data"
-    )
-    # augmentation of SC data to make it similar to ST
-    adata_sc.X = adata_sc.layers["counts"]
-    adata_st = adata_st[:, markers_intersect]
-    adata_sc = adata_sc[:, markers_intersect]
-
-    adata_sc_augmented = augment_data(
-        adata_sc, annotation=annotation_sc, percentage=0.7
-    )
-    logger.info(
-        f"Augmentation and rebalancing created new anndata object of shape: {adata_sc_augmented.shape} compared to old shape: {adata_sc.shape}"
-    )
-
-    if sum(adata_sc_augmented.X.sum(axis=1) == 0) > 0:
-        logger.warning(f"Input contains cells with 0 expression")
-
-    return adata_sc_augmented, adata_st, markers_intersect
-
-
 def plot_loss_curve(ce, path):
     fig, axs = plt.subplots(2)
     axs[0].plot(ce.train_loss_history_contrastive, label="Training")
@@ -736,21 +690,14 @@ def contrastive_process(
     queue=None,
 ):
     fix_seed(0)
-
-    adata_sc.obs_names_make_unique()
-    adata_st.obs_names_make_unique()
-
-    if not scipy.sparse.issparse(adata_sc.X):
-        adata_sc.X = scipy.sparse.csr_matrix(adata_sc.X)
-        logger.info("Converted SC gene exp matrix to csr")
+    adata_sc.X = adata_sc.layers["counts"]
 
     if not scipy.sparse.issparse(adata_st.X):
         adata_st.X = scipy.sparse.csr_matrix(adata_st.X)
         logger.info("Converted ST gene exp matrix to csr")
 
-    adata_sc, adata_st, markers_intersect = subset_on_marker_genes_with_augmentation(
-        adata_sc, adata_st, annotation_sc
-    )
+    # preprocess(adata_sc)
+    adata_sc = augment_data(adata_sc, annotation=annotation_sc, percentage=0.7)
 
     # perform preprocessing like removing all 0 vectors, normalization and scaling
 
@@ -801,7 +748,6 @@ def contrastive_process(
 
     logger.info("-------------ST prediction------------")
     adata_st.var_names_make_unique()
-    adata_st = adata_st[:, markers_intersect]
     if not scipy.sparse.issparse(adata_st.X):
         adata_st.X = scipy.sparse.csr_matrix(adata_st.X)
         logger.info(f"Converted gene exp matrix of ST to csr_matrix")

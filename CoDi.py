@@ -20,7 +20,6 @@ from scipy.sparse import issparse
 import seaborn as sns
 from tqdm import tqdm
 
-# import core
 
 random.seed(3)
 
@@ -108,7 +107,10 @@ def per_cell(ii):
     best_match_subset = {
         "cell_type": cn.most_common(1)[0][0],
         "confidence": np.round(cn.most_common(1)[0][1] / num_of_subsets, 3),
-        "ct_probabilities": [np.round(cn[cellt]/num_of_subsets, 3) if cellt in cn.keys() else 0.0 for cellt in adata_st.obsm['probabilities_dist'].columns],
+        "ct_probabilities": [
+            np.round(cn[cellt] / num_of_subsets, 3) if cellt in cn.keys() else 0.0
+            for cellt in adata_st.obsm["probabilities_dist"].columns
+        ],
     }
     pbar.update(1)  # global variable
     return (ii, best_match_subset)
@@ -213,11 +215,37 @@ adata_sc = sc.read_h5ad(args.sc_path)
 adata_st = sc.read_h5ad(args.st_path)
 adata_sc.var_names_make_unique()
 adata_st.var_names_make_unique()
+adata_sc.obs_names_make_unique()
+adata_st.obs_names_make_unique()
+
+# Calculate marker genes
+start_marker = time.time()
+adata_sc.layers["counts"] = adata_sc.X.copy()
+if "rank_genes_groups" not in adata_sc.uns:
+    sc.pp.normalize_total(adata_sc, target_sum=1e4)
+    sc.pp.log1p(adata_sc)
+    sc.pp.highly_variable_genes(adata_sc, inplace=True, n_top_genes=200)
+    sc.tl.rank_genes_groups(adata_sc, groupby=args.annotation, use_raw=False)
+else:
+    logger.info(f"***d Using precalculated marker genes in input h5ad.")
+
+markers_df = pd.DataFrame(adata_sc.uns["rank_genes_groups"]["names"]).iloc[
+    0 : args.num_markers, :
+]
+markers = list(np.unique(markers_df.melt().value.values))
+
+markers_intersect = list(set(markers).intersection(adata_st.var.index))
+logger.info(
+    f"Using {len(markers_intersect)} single cell marker genes that exist in ST dataset"
+)
+end_marker = time.time()
+marker_time = np.round(end_marker - start_marker, 3)
+logger.info(f"Calculation of marker genes took {marker_time}")
 
 # Contrastive part
 if args.contrastive:
     import core
-    
+
     queue = mp.Queue()
 
     contrastive_proc = mp.Process(
@@ -225,10 +253,10 @@ if args.contrastive:
         kwargs=dict(
             sc_path=args.sc_path,
             st_path=args.st_path,
-            adata_sc=adata_sc,
-            adata_st=adata_st,
+            adata_sc=adata_sc[:, markers_intersect],
+            adata_st=adata_st[:, markers_intersect],
             annotation_sc=args.annotation,
-            epochs=50,
+            epochs=100,
             embedding_dim=32,
             encoder_depth=4,
             classifier_depth=2,
@@ -277,45 +305,26 @@ if args.distance == "none":
 #     index=adata_st.obs.index, columns=adata_st.var.index
 # ).copy()
 
-# Calculate marker genes
-start_marker = time.time()
-if "rank_genes_groups" not in adata_sc.uns:
-    sc.pp.normalize_total(adata_sc, target_sum=1e4)
-    sc.pp.log1p(adata_sc)
-    sc.pp.highly_variable_genes(adata_sc, inplace=True, n_top_genes=200)
-    sc.tl.rank_genes_groups(adata_sc, groupby=args.annotation, use_raw=False)
-else:
-    logger.info(f"***d Using precalculated marker genes in input h5ad.")
-
-markers_df = pd.DataFrame(adata_sc.uns["rank_genes_groups"]["names"]).iloc[
-    0 : args.num_markers, :
-]
-markers = list(np.unique(markers_df.melt().value.values))
-
-# visualize results
-# sc.pl.rank_genes_groups(adata_sc, key='rank_genes_groups_filtered')
-# visualize results using dotplot
-# sc.pl.rank_genes_groups_dotplot(adata_sc, key='rank_genes_groups_filtered')
-# hvgs = list(adata_sc.var[adata_sc.var.highly_variable].index)
-markers_intersect = list(set(markers).intersection(adata_st.var.index))
-logger.info(
-    f"Using {len(markers_intersect)} single cell marker genes that exist in ST dataset"
-)
-end_marker = time.time()
-marker_time = np.round(end_marker - start_marker, 3)
-logger.info(
-    f"Calculation of marker genes took {marker_time}"
-)
 
 # Extract gene expressions only from marker genes
 select_ind = [np.where(adata_sc.var.index == gene)[0][0] for gene in markers_intersect]
-sc_df = adata_sc.X.tocsr()[:, select_ind].todense() if issparse(adata_sc.X) else adata_sc.X[:, select_ind]
+sc_df = (
+    adata_sc.X.tocsr()[:, select_ind].todense()
+    if issparse(adata_sc.X)
+    else adata_sc.X[:, select_ind]
+)
 sc_df = pd.DataFrame(sc_df, columns=markers_intersect, index=adata_sc.obs.index)
 select_ind = [np.where(adata_st.var.index == gene)[0][0] for gene in markers_intersect]
-st_df = adata_st.X.tocsr()[:, select_ind].todense() if issparse(adata_st.X) else adata_st.X[:, select_ind]
+st_df = (
+    adata_st.X.tocsr()[:, select_ind].todense()
+    if issparse(adata_st.X)
+    else adata_st.X[:, select_ind]
+)
 st_df = pd.DataFrame(st_df, columns=markers_intersect, index=adata_st.obs.index)
 cell_types = list(sorted(adata_sc.obs[args.annotation].unique()))
-adata_st.obsm['probabilities_dist'] = pd.DataFrame(index=adata_st.obs.index, columns=cell_types).astype('float32')
+adata_st.obsm["probabilities_dist"] = pd.DataFrame(
+    index=adata_st.obs.index, columns=cell_types
+).astype("float32")
 
 # Algo
 # *****************************************
@@ -360,7 +369,9 @@ assigned_types.sort(key=lambda x: x[0])
 assigned_types = [at[1] for at in assigned_types]
 adata_st.obs["CoDi_dist"] = [x["cell_type"] for x in assigned_types]
 adata_st.obs["confidence_dist"] = [x["confidence"] for x in assigned_types]
-adata_st.obsm['probabilities_dist'].iloc[:, :] = [x["ct_probabilities"] for x in assigned_types]
+adata_st.obsm["probabilities_dist"].iloc[:, :] = [
+    x["ct_probabilities"] for x in assigned_types
+]
 
 # sns.histplot([x["confidence"] for x in assigned_types])
 # plt.savefig(f"CoDi_confidence_hist__{args.distance}.png", dpi=120, bbox_inches="tight")
@@ -375,16 +386,20 @@ if args.contrastive:
 # combine contrastive and distance results
 dist_weight = 0.5
 if args.contrastive:
-    assert 'probabilities_contrastive' in adata_st.obsm, "Missing 'probabilities_contrastive' in adata_st.obsm."
-    adata_st.obsm['probabilities'] = adata_st.obsm['probabilities_contrastive'].add(adata_st.obsm['probabilities_dist'] * dist_weight)
-    adata_st.obs['CoDi'] = np.array([prow.idxmax() for _, prow in adata_st.obsm['probabilities'].iterrows()]).astype('str') 
+    assert (
+        "probabilities_contrastive" in adata_st.obsm
+    ), "Missing 'probabilities_contrastive' in adata_st.obsm."
+    adata_st.obsm["probabilities"] = adata_st.obsm["probabilities_contrastive"].add(
+        adata_st.obsm["probabilities_dist"] * dist_weight
+    )
+    adata_st.obs["CoDi"] = np.array(
+        [prow.idxmax(axis=1) for _, prow in adata_st.obsm["probabilities"].iterrows()]
+    ).astype("str")
 else:
-    adata_st.obs['CoDi'] = adata_st.obs['CoDi_dist']
+    adata_st.obs["CoDi"] = adata_st.obs["CoDi_dist"]
 
 end = time.time()
-logger.info(
-    f"CoDi execution took: {end - start}s"
-    )
+logger.info(f"CoDi execution took: {end - start}s")
 
 # Write CSV and H5AD
 adata_st.obs.index.name = "cell_id"
@@ -420,6 +435,4 @@ if "spatial" in adata_st.obsm_keys():
     )
 
 end = time.time()
-logger.info(
-    f"Total execution time: {end - start}s"
-    )
+logger.info(f"Total execution time: {end - start}s")
