@@ -391,11 +391,11 @@ adata_st.obs.index.name = "cell_id"
 # Write CSV and H5AD of final combined results
 if args.contrastive:
     adata_st.obs[["CoDi_dist", "CoDi_contrastive", "CoDi"]].to_csv(
-        os.path.basename(args.st_path).replace(".csv", f"_CoDi_{args.distance}.csv")
+        os.path.basename(args.st_path).replace(".h5ad", f"_CoDi_{args.distance}.csv")
     )
 else:
     adata_st.obs[["CoDi_dist", "CoDi"]].to_csv(
-        os.path.basename(args.st_path).replace(".csv", f"_CoDi_{args.distance}.csv")
+        os.path.basename(args.st_path).replace(".h5ad", f"_CoDi_{args.distance}.csv")
     )  
 adata_st.write_h5ad(
     os.path.basename(args.st_path).replace(".h5ad", f"_CoDi_{args.distance}.h5ad")
