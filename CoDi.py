@@ -321,7 +321,7 @@ st_df = (
     else adata_st.X[:, select_ind]
 )
 st_df = pd.DataFrame(st_df, columns=markers_intersect, index=adata_st.obs.index)
-cell_types = np.array(sorted(adata_sc.obs[args.annotation].unique())).astype("str")
+cell_types = list(sorted(adata_sc.obs[args.annotation].unique()))
 adata_st.obsm["probabilities_dist"] = pd.DataFrame(
     index=adata_st.obs.index, columns=cell_types
 ).astype("float32")
