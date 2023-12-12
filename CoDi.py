@@ -357,25 +357,24 @@ def main():
         predictions = queue.get()
         adata_st.obs["CoDi_contrastive"] = predictions
         adata_st.obs["confidence_contrastive"] = [
-            np.round(prow.max(), 2)
+            np.round(prow.max(), 3)
             for _, prow in adata_st.obsm["probabilities_contrastive"].iterrows()
         ]
         contrastive_proc.join()
 
     # combine contrastive and distance results
-    dist_weight = 0.5
     if args.contrastive:
         assert (
             "probabilities_contrastive" in adata_st.obsm
         ), "Missing 'probabilities_contrastive' in adata_st.obsm."
         adata_st.obsm["probabilities"] = adata_st.obsm["probabilities_contrastive"].add(
-            adata_st.obsm["probabilities_dist"] * dist_weight
+            adata_st.obsm["probabilities_dist"] * args.dist_prob_weight
         )
         adata_st.obs["CoDi"] = np.array(
             [prow.idxmax() for _, prow in adata_st.obsm["probabilities"].iterrows()]
         ).astype("str")
         adata_st.obs["confidence"] = [
-            prow.max() for _, prow in adata_st.obsm["probabilities"].iterrows()
+            np.round(prow.max(), 3) for _, prow in adata_st.obsm["probabilities"].iterrows()
         ]
     else:
         adata_st.obs["CoDi"] = adata_st.obs["CoDi_dist"]
@@ -478,6 +477,13 @@ if __name__ == "__main__":
         type=int,
         required=False,
         default=100,
+    )
+    parser.add_argument(
+        "--dist_prob_weight",
+        help="Weight coefficient (<=1.0) for probabilities obtained by distance metric.",
+        type=float,
+        required=False,
+        default=0.5,
     )
     parser.add_argument(
         "--batch_size",
