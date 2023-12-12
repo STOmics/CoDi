@@ -7,7 +7,6 @@ from typing import Optional
 import time
 import random
 import os
-from zoneinfo import ZoneInfo
 import sys
 
 
@@ -25,7 +24,6 @@ import torch.nn as nn
 from torch.nn.functional import cosine_similarity
 import torch.nn.functional as F
 from torch.utils.data import Dataset
-from torch.cuda.amp import GradScaler
 from torch.optim import Adam, SGD
 from torch.utils.data import DataLoader
 from tqdm.auto import tqdm
@@ -34,21 +32,13 @@ from sklearn.metrics import accuracy_score, f1_score
 from core.contrastive_augmentation import augment_data
 from core.preprocessing import preprocess
 
-dirs = ["logs", "loss_curves", "contrastive_res", "models"]
+dirs = ["loss_curves", "models"]
 for d in dirs:
     if not os.path.exists(d):
         os.makedirs(d)
 
-timestamp = datetime.datetime.now(tz=ZoneInfo("Europe/Berlin")).strftime(
-    "%d_%m_%Y_%H_%M_%S"
-)
-logging.basicConfig(
-    format="%(asctime)s [%(threadName)-12.12s] %(name)-12s [%(levelname)-8s] %(message)s",
-    level=logging.INFO,
-    filename=f"logs/{timestamp}.log",
-)
+timestamp = datetime.datetime.now().strftime("%d_%m_%Y_%H_%M")
 logger = logging.getLogger(__name__)
-# logger.addHandler(logging.StreamHandler(sys.stdout))
 
 
 class CombinedLoss(nn.Module):
@@ -689,12 +679,17 @@ def contrastive_process(
     classifier_depth: int = 2,
     queue=None,
 ):
+    logname = os.path.basename(st_path).replace(".h5ad", "")
+    filename = f"logs/{logname}.log"
+    file_handler = logging.FileHandler(filename)
+    logger.addHandler(file_handler)
+
     fix_seed(0)
     adata_sc.X = adata_sc.layers["counts"]
 
-    if not scipy.sparse.issparse(adata_st.X):
-        adata_st.X = scipy.sparse.csr_matrix(adata_st.X)
-        logger.info("Converted ST gene exp matrix to csr")
+    # if not scipy.sparse.issparse(adata_st.X):
+    #     adata_st.X = scipy.sparse.csr_matrix(adata_st.X)
+    #     logger.info("Converted ST gene exp matrix to csr")
 
     # preprocess(adata_sc)
     adata_sc = augment_data(adata_sc, annotation=annotation_sc, percentage=0.7)
@@ -760,6 +755,9 @@ def contrastive_process(
     probabilities = ce.predict_proba(adata_st.X.toarray())
     df_probabilities = pd.DataFrame(
         data=probabilities, columns=le.classes_, index=adata_st.obs.index
+    )
+    logger.info(
+        f"CUDA max memory [GB]: {(torch.cuda.max_memory_allocated(ce.device) / 1000**3):.2f}"
     )
     if queue:
         queue.put(df_probabilities)

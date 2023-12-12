@@ -155,10 +155,8 @@ def plot_spatial(
     sns.despine(bottom=True, left=True, ax=ax)
 
 
-logging.basicConfig(
-    format="%(asctime)s %(name)-12s %(levelname)-8s %(message)s", level=logging.INFO
-)
-logger = logging.getLogger(__name__)
+if not os.path.exists("logs"):
+    os.makedirs("logs")
 
 parser = ap.ArgumentParser(description="A script that performs CoDi.")
 parser.add_argument(
@@ -210,6 +208,11 @@ parser.add_argument("-c", "--contrastive", action="store_true")
 
 args = parser.parse_args()
 
+logging.basicConfig(
+    format="%(asctime)s %(name)-12s %(levelname)-8s %(message)s",
+    level=logging.INFO,
+)
+logger = logging.getLogger(__name__)
 
 adata_sc = sc.read_h5ad(args.sc_path)
 adata_st = sc.read_h5ad(args.st_path)
