@@ -169,17 +169,22 @@ def main():
 
     # place cell spatial coordinates in .obsm['spatial']
     # coordinates are expected in 'spatial', 'X_spatial', and 'spatial_stereoseq'
-    if 'X_spatial' in adata_st.obsm:
-        adata_st.obsm['spatial'] = adata_st.obsm['X_spatial'].copy()
-    elif 'spatial_stereoseq' in adata_st.obsm:
-        adata_st.obsm['spatial'] = np.array(adata_st.obsm['spatial_stereoseq'].copy())
-    elif 'spatial' in adata_st.obsm:
+    if "X_spatial" in adata_st.obsm:
+        adata_st.obsm["spatial"] = adata_st.obsm["X_spatial"].copy()
+    elif "spatial_stereoseq" in adata_st.obsm:
+        adata_st.obsm["spatial"] = np.array(adata_st.obsm["spatial_stereoseq"].copy())
+    elif "spatial" in adata_st.obsm:
+        pass
+    elif os.path.splitext(args.sc_path)[0] in args.st_path:
+        # allow no spatial information for SC synthetic data
         pass
     else:
-        raise KeyError('Spatial coordinates not found. Labels expected in: \
+        raise KeyError(
+            'Spatial coordinates not found. Labels expected in: \
                 .obsm["spatial"] or\n \
                 .obsm["X_spatial"] or\n \
-                .obsm["spatial_stereoseq"]')
+                .obsm["spatial_stereoseq"]'
+        )
 
     # Calculate marker genes
     start_marker = time.time()
@@ -351,6 +356,10 @@ def main():
         adata_st.obsm["probabilities_contrastive"] = df_probabilities
         predictions = queue.get()
         adata_st.obs["CoDi_contrastive"] = predictions
+        adata_st.obs["confidence_contrastive"] = [
+            np.round(prow.max(), 2)
+            for _, prow in adata_st.obsm["probabilities_contrastive"].iterrows()
+        ]
         contrastive_proc.join()
 
     # combine contrastive and distance results
@@ -363,13 +372,14 @@ def main():
             adata_st.obsm["probabilities_dist"] * dist_weight
         )
         adata_st.obs["CoDi"] = np.array(
-            [
-                prow.idxmax(axis=1)
-                for _, prow in adata_st.obsm["probabilities"].iterrows()
-            ]
+            [prow.idxmax() for _, prow in adata_st.obsm["probabilities"].iterrows()]
         ).astype("str")
+        adata_st.obs["confidence"] = [
+            prow.max() for _, prow in adata_st.obsm["probabilities"].iterrows()
+        ]
     else:
         adata_st.obs["CoDi"] = adata_st.obs["CoDi_dist"]
+        adata_st.obs["confidence"] = adata_st.obs["confidence_dist"]
 
     end = time.time()
     logger.info(f"CoDi execution took: {end - start}s")
@@ -378,13 +388,22 @@ def main():
     adata_st.obs.index.name = "cell_id"
     # Write CSV and H5AD of final combined results
     if args.contrastive:
-        adata_st.obs[["CoDi_dist", "CoDi_contrastive", "CoDi"]].to_csv(
+        adata_st.obs[
+            [
+                "CoDi_dist",
+                "confidence_dist",
+                "CoDi_contrastive",
+                "confidence_contrastive",
+                "CoDi",
+                "confidence",
+            ]
+        ].to_csv(
             os.path.basename(args.st_path).replace(
                 ".h5ad", f"_CoDi_{args.distance}.csv"
             )
         )
     else:
-        adata_st.obs[["CoDi_dist", "CoDi"]].to_csv(
+        adata_st.obs[["CoDi_dist", "confidence_dist", "CoDi", "confidence"]].to_csv(
             os.path.basename(args.st_path).replace(
                 ".h5ad", f"_CoDi_{args.distance}.csv"
             )
@@ -400,7 +419,7 @@ def main():
         )
         plot_spatial(
             adata_st,
-            annotation=f"confidence_dist",
+            annotation=f"confidence",
             spot_size=50,
             ax=axs[1],
             title="Confidence map",
