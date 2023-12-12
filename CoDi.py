@@ -441,15 +441,15 @@ logger.info(f"CoDi execution took: {end - start}s")
 
 # Write CSV and H5AD
 adata_st.obs.index.name = "cell_id"
-if args.contrastive:
-    # Write CSV of contrastive results
-    adata_st.obs["CoDi_contrastive"].to_csv(
-        os.path.basename(args.st_path).replace(".h5ad", "_contrastive.csv")
-    )
 # Write CSV and H5AD of final combined results
-adata_st.obs[["CoDi"]].to_csv(
-    os.path.basename(args.st_path).replace(".h5ad", f"_CoDi_{args.distance}.csv")
-)
+if args.contrastive:
+    adata_st.obs[["CoDi_dist", "CoDi_contrastive", "CoDi"]].to_csv(
+        os.path.basename(args.st_path).replace(".h5ad", f"_CoDi_{args.distance}.csv")
+    )
+else:
+    adata_st.obs[["CoDi_dist", "CoDi"]].to_csv(
+        os.path.basename(args.st_path).replace(".h5ad", f"_CoDi_{args.distance}.csv")
+    )  
 adata_st.write_h5ad(
     os.path.basename(args.st_path).replace(".h5ad", f"_CoDi_{args.distance}.h5ad")
 )
