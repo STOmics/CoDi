@@ -673,15 +673,15 @@ def contrastive_process(
     adata_sc: ad.AnnData,
     adata_st: ad.AnnData,
     annotation_sc: str,
-    epochs: int = 50,
-    embedding_dim: int = 32,
-    encoder_depth: int = 4,
-    classifier_depth: int = 2,
+    epochs: int,
+    embedding_dim: int,
+    encoder_depth: int,
+    classifier_depth: int,
     queue=None,
 ):
     logname = os.path.basename(st_path).replace(".h5ad", "")
     filename = f"logs/{logname}.log"
-    file_handler = logging.FileHandler(filename)
+    file_handler = logging.FileHandler(filename, "w")
     logger.addHandler(file_handler)
 
     fix_seed(0)

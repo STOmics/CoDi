@@ -198,6 +198,41 @@ parser.add_argument(
     default=100,
 )
 parser.add_argument(
+    "--batch_size",
+    help="Number of samples in the batch. Defaults to 512",
+    type=int,
+    required=False,
+    default=512,
+)
+parser.add_argument(
+    "--epochs",
+    help="Number of epochs to train deep encoder. Defaults to 50",
+    type=int,
+    required=False,
+    default=50,
+)
+parser.add_argument(
+    "--emb_dim",
+    help="Dimension of the output embeddings. Defaults to 32.",
+    type=int,
+    required=False,
+    default=32,
+)
+parser.add_argument(
+    "--enc_depth",
+    help="Number of layers in the encoder MLP. Defaults to 4.",
+    type=int,
+    required=False,
+    default=4,
+)
+parser.add_argument(
+    "--class_depth",
+    help="Number of layers in the classifier MLP. Defaults to 2.",
+    type=int,
+    required=False,
+    default=2,
+)
+parser.add_argument(
     "--n_jobs",
     help="Number of jobs to run in parallel. -1 means using all available processors",
     type=int,
@@ -259,10 +294,10 @@ if args.contrastive:
             adata_sc=adata_sc[:, markers_intersect],
             adata_st=adata_st[:, markers_intersect],
             annotation_sc=args.annotation,
-            epochs=100,
-            embedding_dim=32,
-            encoder_depth=4,
-            classifier_depth=2,
+            epochs=args.epochs,
+            embedding_dim=args.emb_dim,
+            encoder_depth=args.enc_depth,
+            classifier_depth=args.class_depth,
             queue=queue,
         ),
         name="Contrastive process",
