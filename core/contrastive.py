@@ -748,9 +748,6 @@ def contrastive_process(
     y_pred = ce.predict(adata_st.X.toarray())
     adata_st.obs["contrastive"] = le.inverse_transform(y_pred)
     adata_st.obs.index.name = "cell_id"
-    adata_st.obs["contrastive"].to_csv(
-        os.path.basename(st_path).replace(".h5ad", f"_contrastive.csv")
-    )
     probabilities = ce.predict_proba(adata_st.X.toarray())
     df_probabilities = pd.DataFrame(
         data=probabilities, columns=le.classes_, index=adata_st.obs.index
