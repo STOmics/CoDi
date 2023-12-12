@@ -677,22 +677,21 @@ def contrastive_process(
     embedding_dim: int,
     encoder_depth: int,
     classifier_depth: int,
+    filename: str,
+    augmentation_perc: float,
     queue=None,
 ):
-    logname = os.path.basename(st_path).replace(".h5ad", "")
-    filename = f"logs/{logname}.log"
-    file_handler = logging.FileHandler(filename, "w")
-    logger.addHandler(file_handler)
+    if filename:
+        file_handler = logging.FileHandler(filename)
+        logger.addHandler(file_handler)
 
     fix_seed(0)
     adata_sc.X = adata_sc.layers["counts"]
 
-    # if not scipy.sparse.issparse(adata_st.X):
-    #     adata_st.X = scipy.sparse.csr_matrix(adata_st.X)
-    #     logger.info("Converted ST gene exp matrix to csr")
-
     # preprocess(adata_sc)
-    adata_sc = augment_data(adata_sc, annotation=annotation_sc, percentage=0.7)
+    adata_sc = augment_data(
+        adata_sc, annotation=annotation_sc, percentage=augmentation_perc
+    )
 
     # perform preprocessing like removing all 0 vectors, normalization and scaling
 
@@ -757,7 +756,7 @@ def contrastive_process(
         data=probabilities, columns=le.classes_, index=adata_st.obs.index
     )
     logger.info(
-        f"CUDA max memory [GB]: {(torch.cuda.max_memory_allocated(ce.device) / 1000**3):.2f}"
+        f"[Contrastive] CUDA max memory [GB]: {(torch.cuda.max_memory_allocated(ce.device) / 1000**3):.2f}"
     )
     if queue:
         queue.put(df_probabilities)
