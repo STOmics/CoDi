@@ -167,6 +167,20 @@ def main():
     adata_sc.obs_names_make_unique()
     adata_st.obs_names_make_unique()
 
+    # place cell spatial coordinates in .obsm['spatial']
+    # coordinates are expected in 'spatial', 'X_spatial', and 'spatial_stereoseq'
+    if 'X_spatial' in adata_st.obsm:
+        adata_st.obsm['spatial'] = adata_st.obsm['X_spatial'].copy()
+    elif 'spatial_stereoseq' in adata_st.obsm:
+        adata_st.obsm['spatial'] = np.array(adata_st.obsm['spatial_stereoseq'].copy())
+    elif 'spatial' in adata_st.obsm:
+        pass
+    else:
+        raise KeyError('Spatial coordinates not found. Labels expected in: \
+                .obsm["spatial"] or\n \
+                .obsm["X_spatial"] or\n \
+                .obsm["spatial_stereoseq"]')
+
     # Calculate marker genes
     start_marker = time.time()
     adata_sc.layers["counts"] = adata_sc.X.copy()
