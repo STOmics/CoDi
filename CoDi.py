@@ -14,6 +14,7 @@ import scanpy as sc
 import seaborn as sns
 import multiprocessing as mp
 import argparse as ap
+
 # from tqdm import tqdm
 
 from scipy.spatial.distance import mahalanobis
@@ -340,7 +341,12 @@ def main():
     logger.info(f"Starting parallel per cell calculation of distances.")
     # pbar = tqdm(total=len(st_df))
     with mp.Pool(processes=num_cpus_used) as pool:
-        assigned_types = pool.starmap(per_cell, zip(iis, repeat(subsets), repeat(cell_types), repeat(st_df), repeat(sc_mean)))
+        assigned_types = pool.starmap(
+            per_cell,
+            zip(
+                iis, repeat(subsets), repeat(cell_types), repeat(st_df), repeat(sc_mean)
+            ),
+        )
 
     assigned_types.sort(key=lambda x: x[0])
     assigned_types = [at[1] for at in assigned_types]
@@ -369,14 +375,15 @@ def main():
         assert (
             "probabilities_contrastive" in adata_st.obsm
         ), "Missing 'probabilities_contrastive' in adata_st.obsm."
-        adata_st.obsm["probabilities"] = (adata_st.obsm["probabilities_contrastive"].add(
-            adata_st.obsm["probabilities_dist"] * args.dist_prob_weight) / (1.0 + args.dist_prob_weight)
-        )
+        adata_st.obsm["probabilities"] = (
+            adata_st.obsm["probabilities_contrastive"] * (1.0 - args.dist_prob_weight)
+        ).add(adata_st.obsm["probabilities_dist"] * args.dist_prob_weight)
         adata_st.obs["CoDi"] = np.array(
             [prow.idxmax() for _, prow in adata_st.obsm["probabilities"].iterrows()]
         ).astype("str")
         adata_st.obs["confidence"] = [
-            np.round(prow.max(), 3) for _, prow in adata_st.obsm["probabilities"].iterrows()
+            np.round(prow.max(), 3)
+            for _, prow in adata_st.obsm["probabilities"].iterrows()
         ]
     else:
         adata_st.obs["CoDi"] = adata_st.obs["CoDi_dist"]
@@ -482,7 +489,7 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "--dist_prob_weight",
-        help="Weight coefficient for probabilities obtained by distance metric.",
+        help="Weight coefficient for probabilities obtained by distance metric. Contrastive probabilities are weighted with 1.0-dist_prob_weight",
         type=float,
         required=False,
         default=1.0,
