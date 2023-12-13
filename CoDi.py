@@ -1,8 +1,5 @@
-import argparse as ap
-from collections import Counter
 import datetime
 import logging
-import multiprocessing as mp
 import sys
 import random
 import time
@@ -14,13 +11,19 @@ from memory_profiler import memory_usage
 import numpy as np
 import pandas as pd
 import scanpy as sc
+import seaborn as sns
+import multiprocessing as mp
+import argparse as ap
+
+# from tqdm import tqdm
+
 from scipy.spatial.distance import mahalanobis
 from scipy.stats import entropy
 from scipy.special import rel_entr, kl_div
 from scipy.stats import wasserstein_distance
 from scipy.sparse import issparse
-import seaborn as sns
-from tqdm import tqdm
+from collections import Counter
+from itertools import repeat
 
 
 random.seed(3)
@@ -50,7 +53,7 @@ def binary_distance(p, q):
     return np.sum(p.astype(bool) ^ q.astype(bool))
 
 
-def per_cell(ii):
+def per_cell(ii, subsets, cell_types, st_df, sc_mean):
     best_matches_subsets = []
     for subset_id, subset in enumerate(subsets):
         best_match = {"cell_type": "", "dist": 9999999}
@@ -108,13 +111,13 @@ def per_cell(ii):
     cn = Counter([x["cell_type"] for x in best_matches_subsets])
     best_match_subset = {
         "cell_type": cn.most_common(1)[0][0],
-        "confidence": np.round(cn.most_common(1)[0][1] / num_of_subsets, 3),
+        "confidence": np.round(cn.most_common(1)[0][1] / len(subsets), 3),
         "ct_probabilities": [
-            np.round(cn[cellt] / num_of_subsets, 3) if cellt in cn.keys() else 0.0
-            for cellt in adata_st.obsm["probabilities_dist"].columns
+            np.round(cn[cellt] / len(subsets), 3) if cellt in cn.keys() else 0.0
+            for cellt in cell_types
         ],
     }
-    pbar.update(1)  # global variable
+    # pbar.update(1)
     return (ii, best_match_subset)
 
 
@@ -166,6 +169,25 @@ def main():
     adata_st.var_names_make_unique()
     adata_sc.obs_names_make_unique()
     adata_st.obs_names_make_unique()
+
+    # place cell spatial coordinates in .obsm['spatial']
+    # coordinates are expected in 'spatial', 'X_spatial', and 'spatial_stereoseq'
+    if "X_spatial" in adata_st.obsm:
+        adata_st.obsm["spatial"] = adata_st.obsm["X_spatial"].copy()
+    elif "spatial_stereoseq" in adata_st.obsm:
+        adata_st.obsm["spatial"] = np.array(adata_st.obsm["spatial_stereoseq"].copy())
+    elif "spatial" in adata_st.obsm:
+        pass
+    elif os.path.splitext(args.sc_path)[0] in args.st_path:
+        # allow no spatial information for SC synthetic data
+        pass
+    else:
+        raise KeyError(
+            'Spatial coordinates not found. Labels expected in: \
+                .obsm["spatial"] or\n \
+                .obsm["X_spatial"] or\n \
+                .obsm["spatial_stereoseq"]'
+        )
 
     # Calculate marker genes
     start_marker = time.time()
@@ -317,9 +339,14 @@ def main():
     iis = [ii for ii in range(len(st_df))]
 
     logger.info(f"Starting parallel per cell calculation of distances.")
-    pbar = tqdm(total=len(st_df))
+    # pbar = tqdm(total=len(st_df))
     with mp.Pool(processes=num_cpus_used) as pool:
-        assigned_types = pool.map(per_cell, iis)
+        assigned_types = pool.starmap(
+            per_cell,
+            zip(
+                iis, repeat(subsets), repeat(cell_types), repeat(st_df), repeat(sc_mean)
+            ),
+        )
 
     assigned_types.sort(key=lambda x: x[0])
     assigned_types = [at[1] for at in assigned_types]
@@ -337,25 +364,30 @@ def main():
         adata_st.obsm["probabilities_contrastive"] = df_probabilities
         predictions = queue.get()
         adata_st.obs["CoDi_contrastive"] = predictions
+        adata_st.obs["confidence_contrastive"] = [
+            np.round(prow.max(), 3)
+            for _, prow in adata_st.obsm["probabilities_contrastive"].iterrows()
+        ]
         contrastive_proc.join()
 
     # combine contrastive and distance results
-    dist_weight = 0.5
     if args.contrastive:
         assert (
             "probabilities_contrastive" in adata_st.obsm
         ), "Missing 'probabilities_contrastive' in adata_st.obsm."
-        adata_st.obsm["probabilities"] = adata_st.obsm["probabilities_contrastive"].add(
-            adata_st.obsm["probabilities_dist"] * dist_weight
-        )
+        adata_st.obsm["probabilities"] = (
+            adata_st.obsm["probabilities_contrastive"] * (1.0 - args.dist_prob_weight)
+        ).add(adata_st.obsm["probabilities_dist"] * args.dist_prob_weight)
         adata_st.obs["CoDi"] = np.array(
-            [
-                prow.idxmax(axis=1)
-                for _, prow in adata_st.obsm["probabilities"].iterrows()
-            ]
+            [prow.idxmax() for _, prow in adata_st.obsm["probabilities"].iterrows()]
         ).astype("str")
+        adata_st.obs["confidence"] = [
+            np.round(prow.max(), 3)
+            for _, prow in adata_st.obsm["probabilities"].iterrows()
+        ]
     else:
         adata_st.obs["CoDi"] = adata_st.obs["CoDi_dist"]
+        adata_st.obs["confidence"] = adata_st.obs["confidence_dist"]
 
     end = time.time()
     logger.info(f"CoDi execution took: {end - start}s")
@@ -364,13 +396,22 @@ def main():
     adata_st.obs.index.name = "cell_id"
     # Write CSV and H5AD of final combined results
     if args.contrastive:
-        adata_st.obs[["CoDi_dist", "CoDi_contrastive", "CoDi"]].to_csv(
+        adata_st.obs[
+            [
+                "CoDi_dist",
+                "confidence_dist",
+                "CoDi_contrastive",
+                "confidence_contrastive",
+                "CoDi",
+                "confidence",
+            ]
+        ].to_csv(
             os.path.basename(args.st_path).replace(
                 ".h5ad", f"_CoDi_{args.distance}.csv"
             )
         )
     else:
-        adata_st.obs[["CoDi_dist", "CoDi"]].to_csv(
+        adata_st.obs[["CoDi_dist", "confidence_dist", "CoDi", "confidence"]].to_csv(
             os.path.basename(args.st_path).replace(
                 ".h5ad", f"_CoDi_{args.distance}.csv"
             )
@@ -386,7 +427,7 @@ def main():
         )
         plot_spatial(
             adata_st,
-            annotation=f"confidence_dist",
+            annotation=f"confidence",
             spot_size=50,
             ax=axs[1],
             title="Confidence map",
@@ -445,6 +486,13 @@ if __name__ == "__main__":
         type=int,
         required=False,
         default=100,
+    )
+    parser.add_argument(
+        "--dist_prob_weight",
+        help="Weight coefficient for probabilities obtained by distance metric. Contrastive probabilities are weighted with 1.0-dist_prob_weight",
+        type=float,
+        required=False,
+        default=1.0,
     )
     parser.add_argument(
         "--batch_size",
