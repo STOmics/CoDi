@@ -1,8 +1,5 @@
-import argparse as ap
-from collections import Counter
 import datetime
 import logging
-import multiprocessing as mp
 import sys
 import random
 import time
@@ -14,13 +11,18 @@ from memory_profiler import memory_usage
 import numpy as np
 import pandas as pd
 import scanpy as sc
+import seaborn as sns
+import multiprocessing as mp
+import argparse as ap
+# from tqdm import tqdm
+
 from scipy.spatial.distance import mahalanobis
 from scipy.stats import entropy
 from scipy.special import rel_entr, kl_div
 from scipy.stats import wasserstein_distance
 from scipy.sparse import issparse
-import seaborn as sns
-from tqdm import tqdm
+from collections import Counter
+from itertools import repeat
 
 
 random.seed(3)
@@ -50,7 +52,7 @@ def binary_distance(p, q):
     return np.sum(p.astype(bool) ^ q.astype(bool))
 
 
-def per_cell(ii):
+def per_cell(ii, subsets, cell_types, st_df, sc_mean):
     best_matches_subsets = []
     for subset_id, subset in enumerate(subsets):
         best_match = {"cell_type": "", "dist": 9999999}
@@ -108,13 +110,13 @@ def per_cell(ii):
     cn = Counter([x["cell_type"] for x in best_matches_subsets])
     best_match_subset = {
         "cell_type": cn.most_common(1)[0][0],
-        "confidence": np.round(cn.most_common(1)[0][1] / num_of_subsets, 3),
+        "confidence": np.round(cn.most_common(1)[0][1] / len(subsets), 3),
         "ct_probabilities": [
-            np.round(cn[cellt] / num_of_subsets, 3) if cellt in cn.keys() else 0.0
-            for cellt in adata_st.obsm["probabilities_dist"].columns
+            np.round(cn[cellt] / len(subsets), 3) if cellt in cn.keys() else 0.0
+            for cellt in cell_types
         ],
     }
-    pbar.update(1)  # global variable
+    # pbar.update(1)
     return (ii, best_match_subset)
 
 
@@ -336,9 +338,9 @@ def main():
     iis = [ii for ii in range(len(st_df))]
 
     logger.info(f"Starting parallel per cell calculation of distances.")
-    pbar = tqdm(total=len(st_df))
+    # pbar = tqdm(total=len(st_df))
     with mp.Pool(processes=num_cpus_used) as pool:
-        assigned_types = pool.map(per_cell, iis)
+        assigned_types = pool.starmap(per_cell, zip(iis, repeat(subsets), repeat(cell_types), repeat(st_df), repeat(sc_mean)))
 
     assigned_types.sort(key=lambda x: x[0])
     assigned_types = [at[1] for at in assigned_types]
