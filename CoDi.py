@@ -369,8 +369,8 @@ def main():
         assert (
             "probabilities_contrastive" in adata_st.obsm
         ), "Missing 'probabilities_contrastive' in adata_st.obsm."
-        adata_st.obsm["probabilities"] = adata_st.obsm["probabilities_contrastive"].add(
-            adata_st.obsm["probabilities_dist"] * args.dist_prob_weight
+        adata_st.obsm["probabilities"] = (adata_st.obsm["probabilities_contrastive"].add(
+            adata_st.obsm["probabilities_dist"] * args.dist_prob_weight) / (1.0 + args.dist_prob_weight)
         )
         adata_st.obs["CoDi"] = np.array(
             [prow.idxmax() for _, prow in adata_st.obsm["probabilities"].iterrows()]
@@ -482,10 +482,10 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "--dist_prob_weight",
-        help="Weight coefficient (<=1.0) for probabilities obtained by distance metric.",
+        help="Weight coefficient for probabilities obtained by distance metric.",
         type=float,
         required=False,
-        default=0.5,
+        default=1.0,
     )
     parser.add_argument(
         "--batch_size",
