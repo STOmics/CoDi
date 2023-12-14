@@ -4,6 +4,7 @@ import sys
 import random
 import time
 import os
+import warnings
 
 import matplotlib.pyplot as plt
 from matplotlib.axes import Axes
@@ -178,11 +179,8 @@ def main():
         adata_st.obsm["spatial"] = np.array(adata_st.obsm["spatial_stereoseq"].copy())
     elif "spatial" in adata_st.obsm:
         pass
-    elif os.path.splitext(args.sc_path)[0] in args.st_path:
-        # allow no spatial information for SC synthetic data
-        pass
     else:
-        raise KeyError(
+        warnings.warn(
             'Spatial coordinates not found. Labels expected in: \
                 .obsm["spatial"] or\n \
                 .obsm["X_spatial"] or\n \
@@ -489,10 +487,10 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "--dist_prob_weight",
-        help="Weight coefficient for probabilities obtained by distance metric. Contrastive probabilities are weighted with 1.0-dist_prob_weight",
+        help="Weight coefficient for probabilities obtained by distance metric. Weight for contrastive is 1.0 - dist_prob_weight.",
         type=float,
         required=False,
-        default=1.0,
+        default=0.5,
     )
     parser.add_argument(
         "--batch_size",
