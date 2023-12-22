@@ -344,6 +344,7 @@ def main():
             zip(
                 iis, repeat(subsets), repeat(cell_types), repeat(st_df), repeat(sc_mean)
             ),
+            chunksize=30,
         )
 
     assigned_types.sort(key=lambda x: x[0])
