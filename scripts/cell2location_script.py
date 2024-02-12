@@ -10,11 +10,6 @@ import matplotlib.pyplot as plt
 import matplotlib as mpl
 import pandas as pd
 
-# Import necessary libraries
-# from memory_profiler import memory_usage
-# import psutil
-# import GPUtil
-
 os.environ["THEANO_FLAGS"] = "device=cuda,floatX=float32,force_device=True"
 torch.set_float32_matmul_precision("medium")
 
@@ -43,21 +38,31 @@ def test_cell2location(args):
     else:
         sc_dataset.uns["is_sparse"] = False
     if (
-        (sc_dataset.raw == None)
+        ('log1p' in sc_dataset.uns.keys())
         and np.max(sc_dataset.X) != np.round(np.max(sc_dataset.X))
     ):
-        # unnormalize the logged data for cell2location
+        # gene expression matrix is logged
+        # perform exponential correction
+        sc_dataset.uns['logged'] = True
+        print(
+            "Cell2location requires data values before log transform, trying to revert SC dataset..."
+        )
+        sc_dataset.X = np.exp(sc_dataset.X) - 1
+    else:
+        sc_dataset.uns['logged'] = False
+    if (np.max(sc_dataset.X) != np.round(np.max(sc_dataset.X))):
+        # unnormalize the data for cell2location
         # cell2location can only work with unnormalized expression values
         print(
             "Cell2location requires unnormalized data, trying to unnormalize SC dataset..."
         )
-        sc_dataset.X = np.exp(sc_dataset.X) - 1
         # find lowest nonzero value
         tmp = sc_dataset.X.copy()
         tmp[tmp == 0] = 1
         sc_dataset.X = sc_dataset.X / np.min(tmp)
         del tmp
-        sc_dataset.X = np.ceil(sc_dataset.X).astype(int)  # make integer
+        sc_dataset.X = np.ceil(sc_dataset.X)
+
     sc_dataset.obsm["spatial"] = np.random.normal(0, 1, [sc_dataset.n_obs, 2])
     sc_dataset.obs["batch"] = [0 for _ in sc_dataset.obs_names]
 
@@ -70,12 +75,21 @@ def test_cell2location(args):
         st_dataset.uns["is_sparse"] = True
     else:
         st_dataset.uns["is_sparse"] = False
-
     if (
-        (st_dataset.raw == None)
+        ('log1p' in st_dataset.uns.keys())
         and np.max(st_dataset.X) != np.round(np.max(st_dataset.X))
     ):
-        # unnormalize the logged data for cell2location
+        # gene expression matrix is logged
+        # perform exponential correction
+        st_dataset.uns['logged'] = True
+        print(
+            "Cell2location requires data values before log transform, trying to revert ST dataset..."
+        )
+        st_dataset.X = np.exp(st_dataset.X) - 1
+    else:
+        st_dataset.uns['logged'] = False
+    if (np.max(st_dataset.X) != np.round(np.max(st_dataset.X))):
+        # unnormalize the data for cell2location
         # cell2location can only work with unnormalized expression values
         print(
             "Cell2location requires unnormalized data, trying to unnormalize ST dataset..."
@@ -86,7 +100,7 @@ def test_cell2location(args):
         tmp[tmp == 0] = 1
         st_dataset.X = st_dataset.X / np.min(tmp)
         del tmp
-        st_dataset.X = np.ceil(st_dataset.X).astype(int)  # make integer
+        st_dataset.X = np.ceil(st_dataset.X)
     # place cell spatial coordinates in .obsm['spatial']
     # coordinates are expected in 'spatial', 'X_spatial', and 'spatial_stereoseq'
     if "X_spatial" in st_dataset.obsm:
@@ -115,8 +129,6 @@ def test_cell2location(args):
     sc_model = cell2location.models.RegressionModel(sc_dataset)
     # test full data training
     sc_model.train(max_epochs=args.max_epochs, accelerator=accelerator)
-    # # test minibatch training
-    # sc_model.train(max_epochs=1, batch_size=1000, accelerator=accelerator)
     # export the estimated cell abundance (summary of the posterior distribution)
     # NOTE: index of sc_dataset is changed through export_posterior
     sc_dataset = sc_model.export_posterior(
@@ -174,7 +186,6 @@ def test_cell2location(args):
             ]
         ].copy()
     inf_aver.columns = sc_dataset.uns["mod"]["factor_names"]
-    # inf_aver.iloc[0:5, 0:5]
 
     # find shared genes and subset both anndata and reference signatures
     intersect = np.intersect1d(st_dataset.var_names, inf_aver.index)
@@ -214,14 +225,12 @@ def test_cell2location(args):
     #     plt.legend(labels=["full data training"])
     #     plt.savefig(f"{run_name}/ELBO_loss.png")
     #     plt.close()
+
     # In this section, we export the estimated cell abundance (summary of the posterior distribution).
-    # st_dataset = mod.export_posterior(
-    #     st_dataset, sample_kwargs={'num_samples': 1000, 'batch_size': mod.adata.n_obs, 'accelerator': accelerator}
-    # )
     st_dataset = mod.export_posterior(
         st_dataset,
         sample_kwargs={
-            "num_samples": 100,
+            "num_samples": 100, #[NOTE] should be changed to args.num_samples
             "batch_size": mod.adata.n_obs
             if (args.batch_size == None or args.batch_size > mod.adata.n_obs)
             else args.batch_size,
@@ -384,10 +393,6 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    # if args.annotation_st == None:
-    #     # if no annotation label is provided for ST, assume it is the same as for SC
-    #     args.annotation_st = args.annotation
-
     results_folder = (
         f'./results/cell2location_{os.path.basename(args.st_path).replace(".h5ad","")}/'
     )
@@ -425,32 +430,10 @@ if __name__ == "__main__":
     # test cell2location (main function)
     test_cell2location(args=args)
 
-    # # Get the peak memory usage
-    # # process = psutil.Process()
-    # # peak_memory = process.memory_info().rss / (1024.0 ** 2)  # in megabytes
-    # memory_snapshots = memory_usage(proc=test_cell2location(args=args), interval=1.0)
-    # max_memory = np.max(memory_snapshots)
-    # # logger.info(f"Total RAM usage [GB]: {(max_memory / 1000):.2f}")
-    # with open(
-    #     os.path.basename(args.st_path).replace(".h5ad", "_cpumem.txt"), "w"
-    # ) as f:
-    #     f.write(f"Peak RAM Usage: {(max_memory / 1000):.2f} GB\n")
-    
-
-    # # Get and print GPU memory usage
-    # gpus = GPUtil.getGPUs()
-    # with open(
-    #     os.path.basename(args.st_path).replace(".h5ad", "_gpumem.txt"), "w+"
-    # ) as text_file:
-    #     for gpu in gpus:
-    #         text_file.write(
-    #             f"GPU {gpu.name}: {(gpu.memoryTotal-gpu.memoryFree):.0f} MB used / {gpu.memoryTotal:.0f} MB total"
-    #         )
-
+    # record execution time
     end_time = time.perf_counter()
     total_time = end_time - start_time
     print(f"Total execution time of cell2location: {total_time:.4f} s")
-
     with open(
         os.path.basename(args.st_path).replace(".h5ad", "_time.txt"), "w"
     ) as text_file:
@@ -476,8 +459,3 @@ if __name__ == "__main__":
         text_file.write(
             f"GPU: {max_gpu_mem} MB used"
         )
-
-
-
-
-
