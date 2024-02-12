@@ -151,12 +151,12 @@ def test_cell2location(args):
     # sc_model.save(ref_run_name, overwrite=True, save_anndata=True)
     # sc_model = cell2location.models.RegressionModel.load(ref_run_name)
 
-    # Save anndata object with results
-    adata_file = f"{ref_run_name}/sc.h5ad"
-    if sc_dataset.uns["is_sparse"]:
-        sc_dataset.X = csr_matrix(sc_dataset.X)
-    sc_dataset.write(adata_file)
-    # adata_file
+    if args.plotting > 0:
+        # Save anndata object with results
+        adata_file = f"{ref_run_name}/sc.h5ad"
+        if sc_dataset.uns["is_sparse"]:
+            sc_dataset.X = csr_matrix(sc_dataset.X)
+        sc_dataset.write(adata_file)
 
     # export estimated expression in each cluster
     if "means_per_cluster_mu_fg" in sc_dataset.varm.keys():
@@ -406,12 +406,12 @@ if __name__ == "__main__":
 
     import subprocess
     logger_fname = os.path.basename(args.st_path).replace(".h5ad","_cpu_gpu_memlog.csv")
-    if not os.path.exists(logger_fname):
-        with open(
-            logger_fname, "w+"
-        ) as text_file:
-            pass
-        text_file.close()
+    if os.path.isfile(logger_fname):
+        os.remove(logger_fname)
+    with open(logger_fname, "w+") as text_file:
+        pass
+    text_file.close()
+
     logger_pid = subprocess.Popen(
         ['python', 'log_gpu_cpu_stats.py',
         logger_fname,
