@@ -150,7 +150,7 @@ def plot_spatial(
         s=s,
         linewidth=0,
         palette=palette
-        if ("float" in str(type(adata.obs[annotation][0])).lower())
+        if ("float" in str(type(adata.obs[annotation].iloc[0])).lower())
         else None,
         marker=".",
     )
@@ -308,7 +308,7 @@ def main():
     # sc_dfs = {}
     sc_icms = {}
     sc_mean = {}
-    num_of_subsets = 20
+    num_of_subsets = 10
     subsets = create_subsets(markers_intersect, num_of_subsets=num_of_subsets)
     for ty in cell_types:
         # sc_dfs[ty] = []
