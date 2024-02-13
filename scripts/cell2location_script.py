@@ -37,20 +37,19 @@ def test_cell2location(args):
         sc_dataset.uns["is_sparse"] = True
     else:
         sc_dataset.uns["is_sparse"] = False
-    if (
-        ('log1p' in sc_dataset.uns.keys())
-        and np.max(sc_dataset.X) != np.round(np.max(sc_dataset.X))
+    if ("log1p" in sc_dataset.uns.keys()) and np.max(sc_dataset.X) != np.round(
+        np.max(sc_dataset.X)
     ):
         # gene expression matrix is logged
         # perform exponential correction
-        sc_dataset.uns['logged'] = True
+        sc_dataset.uns["logged"] = True
         print(
             "Cell2location requires data values before log transform, trying to revert SC dataset..."
         )
         sc_dataset.X = np.exp(sc_dataset.X) - 1
     else:
-        sc_dataset.uns['logged'] = False
-    if (np.max(sc_dataset.X) != np.round(np.max(sc_dataset.X))):
+        sc_dataset.uns["logged"] = False
+    if np.max(sc_dataset.X) != np.round(np.max(sc_dataset.X)):
         # unnormalize the data for cell2location
         # cell2location can only work with unnormalized expression values
         print(
@@ -75,20 +74,19 @@ def test_cell2location(args):
         st_dataset.uns["is_sparse"] = True
     else:
         st_dataset.uns["is_sparse"] = False
-    if (
-        ('log1p' in st_dataset.uns.keys())
-        and np.max(st_dataset.X) != np.round(np.max(st_dataset.X))
+    if ("log1p" in st_dataset.uns.keys()) and np.max(st_dataset.X) != np.round(
+        np.max(st_dataset.X)
     ):
         # gene expression matrix is logged
         # perform exponential correction
-        st_dataset.uns['logged'] = True
+        st_dataset.uns["logged"] = True
         print(
             "Cell2location requires data values before log transform, trying to revert ST dataset..."
         )
         st_dataset.X = np.exp(st_dataset.X) - 1
     else:
-        st_dataset.uns['logged'] = False
-    if (np.max(st_dataset.X) != np.round(np.max(st_dataset.X))):
+        st_dataset.uns["logged"] = False
+    if np.max(st_dataset.X) != np.round(np.max(st_dataset.X)):
         # unnormalize the data for cell2location
         # cell2location can only work with unnormalized expression values
         print(
@@ -230,10 +228,12 @@ def test_cell2location(args):
     st_dataset = mod.export_posterior(
         st_dataset,
         sample_kwargs={
-            "num_samples": 100, #[NOTE] should be changed to args.num_samples
-            "batch_size": mod.adata.n_obs
-            if (args.batch_size == None or args.batch_size > mod.adata.n_obs)
-            else args.batch_size,
+            "num_samples": args.num_samples,
+            "batch_size": (
+                mod.adata.n_obs
+                if (args.batch_size == None or args.batch_size > mod.adata.n_obs)
+                else args.batch_size
+            ),
             "accelerator": accelerator,
         },
     )
@@ -410,22 +410,21 @@ if __name__ == "__main__":
             os.mkdir(run_name)
 
     import subprocess
-    logger_fname = os.path.basename(args.st_path).replace(".h5ad","_cpu_gpu_memlog.csv")
+
+    logger_fname = os.path.basename(args.st_path).replace(
+        ".h5ad", "_cpu_gpu_memlog.csv"
+    )
     if os.path.isfile(logger_fname):
         os.remove(logger_fname)
-    with open(logger_fname, "w+") as text_file:
-        pass
-    text_file.close()
 
     logger_pid = subprocess.Popen(
-        ['python', 'log_gpu_cpu_stats.py',
-        logger_fname,
-        '--loop',  '0.5', # Interval between measurements, in seconds (optional, default=1)
-        '--header',
-        '--no-units',
-        '--csv',
-        ])
-    print('Started logging compute utilisation')
+        [
+            "python",
+            "scripts/log_gpu_cpu_stats.py",
+            logger_fname,
+        ]
+    )
+    print("Started logging compute utilisation")
 
     # test cell2location (main function)
     test_cell2location(args=args)
@@ -441,21 +440,17 @@ if __name__ == "__main__":
 
     # End the background process logging the CPU and GPU utilisation.
     logger_pid.terminate()
-    print('Terminated the compute utilisation logger background process')
+    print("Terminated the compute utilisation logger background process")
 
     # read cpu and gpu memory utilization
     logger_df = pd.read_csv(logger_fname)
 
-    max_cpu_mem = logger_df.loc[:,'RAM'].max()
-    with open(
-        os.path.basename(args.st_path).replace(".h5ad", "_cpumem.txt"), "w"
-    ) as f:
+    max_cpu_mem = logger_df.loc[:, "RAM"].max()
+    with open(os.path.basename(args.st_path).replace(".h5ad", "_cpumem.txt"), "w") as f:
         f.write(f"Peak RAM Usage: {max_cpu_mem} MB\n")
 
-    max_gpu_mem = logger_df.loc[:,'0:GPU_used'].max()
+    max_gpu_mem = logger_df.loc[:, "GPU 0"].max()
     with open(
         os.path.basename(args.st_path).replace(".h5ad", "_gpumem.txt"), "w+"
     ) as text_file:
-        text_file.write(
-            f"GPU: {max_gpu_mem} MB used"
-        )
+        text_file.write(f"GPU: {max_gpu_mem} MB used")
