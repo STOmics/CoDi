@@ -52,9 +52,9 @@ args = parser.parse_args()
 
 filename = None
 timestamp = datetime.datetime.now().strftime("%d_%m_%Y_%H_%M")
-filename = os.path.basename(args.st_path).replace(".h5ad", "")
+filename = os.path.basename(args.st_cell_type_path).replace(".h5ad", "")
 filename = f"logs/{filename}_{timestamp}.log"
-file_handler = logging.FileHandler(filename, mode='a')
+file_handler = logging.FileHandler(filename, mode='w+')
 logger.addHandler(file_handler)
 
 adata_sc = sc.read_h5ad(args.sc_path)
@@ -135,16 +135,14 @@ for col, genes in markers_per_type_top.items():
 
 
 # Read ST cell type annotations from CSV
-if annotation_ct != "seurat":
-    # if the results are given as DataFrame saved to csv use this code
-    st_cell_types_df = pd.read_csv(st_cell_type_path)
-    st_cell_types_df.rename(columns = {st_cell_types_df.columns[0]:'cell_id'}, inplace = True) 
-    st_cell_types_df.set_index(st_cell_types_df.columns[0], inplace=True)
-else:
-    # Seurat provides txt files with ordered results
-    st_cell_types_df = pd.read_csv(st_cell_type_path, header=None, names=['seurat'])
-    st_cell_types_df.index = adata_st.obs.index
-    st_cell_types_df.index.name = 'cell_id'
+st_cell_types_df = pd.read_csv(st_cell_type_path)
+st_cell_types_df.rename(columns = {st_cell_types_df.columns[0]:'cell_id'}, inplace = True) 
+st_cell_types_df.set_index(st_cell_types_df.columns[0], inplace=True)
+
+# # In case of txt files with ordered results
+# st_cell_types_df = pd.read_csv(st_cell_type_path, header=None, names=['seurat'])
+# st_cell_types_df.index = adata_st.obs.index
+# st_cell_types_df.index.name = 'cell_id'
 
 # Exclude cell types with less than <min_cells> cells
 min_cells = 5
