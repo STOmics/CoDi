@@ -159,7 +159,7 @@ logger.info(
     f"Calculate of ST marker genes took {marker_time} so far"
 )
 
-report_df = pd.DataFrame(columns=["sc_marker_genes", "st_marker_genes", "st_cell_types"])
+report_df = pd.DataFrame(columns=["retention type", "sc_marker_genes", "st_marker_genes", "st_cell_types", "retention percentage"])
 for sc_dict_name, sc_dict in zip(["unique marker genes", "top 100 marker genes"],
                                  [markers_per_type_reduced_dict, markers_per_type_top]):
 
@@ -194,16 +194,17 @@ for sc_dict_name, sc_dict in zip(["unique marker genes", "top 100 marker genes"]
 
     logger.info(f'Total scRNA {sc_dict_name} that also exist in ST (for {len(markers_st_df.columns)} cell types): {total_marker_genes_sc}')
     logger.info(f'Remained {sc_dict_name}  in ST: {total_marker_genes_sc - lost_genes}')
-    report_df.loc[sc_dict_name, :] = [total_marker_genes_sc, (total_marker_genes_sc - lost_genes), len(markers_st_df.columns)]
+    report_df.loc[sc_dict_name, :] = [sc_dict_name, total_marker_genes_sc, (total_marker_genes_sc - lost_genes), len(markers_st_df.columns), np.round(100 * (total_marker_genes_sc - lost_genes) / total_marker_genes_sc, 2)]
     st_marker_time3 = time.time()
     marker_time = np.round(st_marker_time3 - st_marker_time2, 3)
     logger.info(
         f"Calculate of ST marker genes for {sc_dict_name} took {marker_time}"
     )
 
-if not os.path.exists("data/reports"):
-    os.makedirs("data/reports")
-report_df.to_csv("data/reports/" + st_cell_type_path.split("/")[-1], index=False)
+reports_path = "data/reports_final/"
+if not os.path.exists(reports_path):
+    os.makedirs(reports_path)
+report_df.to_csv(reports_path + st_cell_type_path.split("/")[-1], index=False)
 
 end_time = time.time()
 total_time = np.round(end_time - start_time, 3)
