@@ -2,7 +2,6 @@
 BASE_PATH="/goofys/projects/SSI/testing/"
 # Run from ssi directory to create reports in ssi/data/reports
 
-<<<<<<< HEAD
 FILES_L5_B5="${BASE_PATH}CoDi/adult_mouse_brain_B5_CoDi.csv
 ${BASE_PATH}cell2location/adult_mouse_brain_B5_cell2location.csv
 ${BASE_PATH}tangram/adult_mouse_brain_B5_tangram.csv
@@ -11,19 +10,21 @@ ${BASE_PATH}seurat/adult_mouse_brain_B5_seurat.csv"
 
 FILES_WHOLE_MOUSE="${BASE_PATH}CoDi/whole_brain_mouse_embryo_CoDi.csv
 ${BASE_PATH}cell2location/whole_brain_mouse_embryo_cell2location.csv
+${BASE_PATH}tangram/whole_brain_mouse_embryo_tangram.csv
 ${BASE_PATH}cytospace/whole_brain_mouse_embryo_cytospace.csv
 ${BASE_PATH}seurat/whole_brain_mouse_embryo_seurat.csv"
 
 FILES_10X="${BASE_PATH}CoDi/visium_mouse_brain_CoDi.csv
-${BASE_PATH}cell2location/visium_mouse_brain_cell2location.csv"
-# ${BASE_PATH}tangram/visium_mouse_brain_tangram.csv
-# ${BASE_PATH}cytospace/visium_mouse_brain_cytospace.csv
-# ${BASE_PATH}seurat/visium_mouse_brain_seurat.csv"
+${BASE_PATH}cell2location/visium_mouse_brain_cell2location.csv
+${BASE_PATH}tangram/visium_mouse_brain_tangram.csv
+${BASE_PATH}cytospace/visium_mouse_brain_cytospace.csv
+${BASE_PATH}seurat/visium_mouse_brain_seurat.csv"
 #/goofys/projects/SSI/testing/RCTD/visium_mouse_brain_RCTD.csv"
 
 FILES_KIDNEY="${BASE_PATH}CoDi/mouse_kidney_CoDi.csv
 ${BASE_PATH}cell2location/mouse_kidney_cell2location.csv
 ${BASE_PATH}seurat/mouse_kidney_seurat.csv
+${BASE_PATH}tangram/mouse_kidney_tangram.csv
 ${BASE_PATH}cytospace/mouse_kidney_cytospace.csv"
 # /goofys/projects/SSI/testing/ssi/mouse_kidney_Puck_191223_19_auth.csv
 {
