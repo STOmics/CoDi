@@ -1,4 +1,5 @@
 import os
+import warnings
 import argparse as ap
 import scanpy as sc
 import numpy as np
@@ -48,15 +49,12 @@ if __name__ == '__main__':
         adata_st.obsm['spatial'] = np.array(adata_st.obsm['spatial_stereoseq'].copy())
     elif 'spatial' in adata_st.obsm:
         pass
-    elif os.path.splitext(args.sc_path)[0] in args.st_path:
-        # allow no spatial information for SC synthetic data
-        # set plotting to 0
-        args.plotting = 0
     else:
-        raise ValueError('Spatial coordinates not found. Labels expected in: \
-            .obsm["spatial"] or\n \
-            .obsm["X_spatial"] or\n \
-            .obsm["spatial_stereoseq"]')
+        warnings.warn('''Spatial coordinates not found. Labels expected in:
+            .obsm["spatial"] or\n
+            .obsm["X_spatial"] or\n
+            .obsm["spatial_stereoseq"]''')
+        args.plotting = 0
 
     # PREPROCESSING
     # marker gene selection

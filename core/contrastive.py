@@ -752,9 +752,6 @@ def contrastive_process(
     df_probabilities = pd.DataFrame(
         data=probabilities, columns=le.classes_, index=adata_st.obs.index
     )
-    logger.info(
-        f"[Contrastive] CUDA max memory [GB]: {(torch.cuda.max_memory_allocated(ce.device) / 1000**3):.2f}"
-    )
     if queue:
         queue.put(df_probabilities)
         queue.put(adata_st.obs["contrastive"])

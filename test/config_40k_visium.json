@@ -1,16 +1,16 @@
 {
     "lq_paths": [
-            "/goofys/projects/SSI/datasets/mouse_brain_visium_cell2location/synthetic_sc.h5ad",
-            "/goofys/projects/SSI/datasets/mouse_brain_visium_cell2location/synthetic_sc_0.05.h5ad",
-            "/goofys/projects/SSI/datasets/mouse_brain_visium_cell2location/synthetic_sc_0.1.h5ad",
-            "/goofys/projects/SSI/datasets/mouse_brain_visium_cell2location/synthetic_sc_0.2.h5ad",
-            "/goofys/projects/SSI/datasets/mouse_brain_visium_cell2location/synthetic_sc_0.3.h5ad",
-            "/goofys/projects/SSI/datasets/mouse_brain_visium_cell2location/synthetic_sc_0.5.h5ad",
-            "/goofys/projects/SSI/datasets/mouse_brain_visium_cell2location/synthetic_sc_0.7.h5ad",
-            "/goofys/projects/SSI/datasets/mouse_brain_visium_cell2location/synthetic_sc_0.9.h5ad"
+            "/goofys/projects/SSI/datasets/mouse_brain_visium_cell2location/synthetic_sc_pruned_inplace.h5ad",
+            "/goofys/projects/SSI/datasets/mouse_brain_visium_cell2location/synthetic_sc_0.05_pruned_inplace.h5ad",
+            "/goofys/projects/SSI/datasets/mouse_brain_visium_cell2location/synthetic_sc_0.1_pruned_inplace.h5ad",
+            "/goofys/projects/SSI/datasets/mouse_brain_visium_cell2location/synthetic_sc_0.2_pruned_inplace.h5ad",
+            "/goofys/projects/SSI/datasets/mouse_brain_visium_cell2location/synthetic_sc_0.3_pruned_inplace.h5ad",
+            "/goofys/projects/SSI/datasets/mouse_brain_visium_cell2location/synthetic_sc_0.5_pruned_inplace.h5ad",
+            "/goofys/projects/SSI/datasets/mouse_brain_visium_cell2location/synthetic_sc_0.7_pruned_inplace.h5ad",
+            "/goofys/projects/SSI/datasets/mouse_brain_visium_cell2location/synthetic_sc_0.9_pruned_inplace.h5ad"
     ],
-    "hq_path": "/goofys/projects/SSI/datasets/mouse_brain_visium_cell2location/sc_raw.h5ad",
+    "hq_path": "/goofys/projects/SSI/datasets/mouse_brain_visium_cell2location/synthetic_sc_pruned_inplace.h5ad",
     "annotation": "annotation_1",
-    "command": "python CoDi.py --sc_path hq_path --st_path lq_path -a annotation",
+    "command": "python CoDi.py --sc_path hq_path --st_path lq_path -a annotation --contrastive --batch_size 9000 --epochs 300 --emb_dim 64",
     "output_suffix": "CoDi"
 }

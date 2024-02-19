@@ -15,6 +15,9 @@ loss_curves/
 contrastive_res/
 logs/
 *.png
+*.h5ad
+*.csv
+*.txt
 
 # Distribution / packaging
 .vscode/

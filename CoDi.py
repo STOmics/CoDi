@@ -5,6 +5,7 @@ import random
 import time
 import os
 import warnings
+import subprocess
 
 import matplotlib.pyplot as plt
 from matplotlib.axes import Axes
@@ -149,9 +150,11 @@ def plot_spatial(
         ax=ax,
         s=s,
         linewidth=0,
-        palette=palette
-        if ("float" in str(type(adata.obs[annotation][0])).lower())
-        else None,
+        palette=(
+            palette
+            if ("float" in str(type(adata.obs[annotation].iloc[0])).lower())
+            else None
+        ),
         marker=".",
     )
     ax.invert_yaxis()
@@ -161,7 +164,7 @@ def plot_spatial(
     sns.despine(bottom=True, left=True, ax=ax)
 
 
-def main():
+def main(args):
     start = time.time()
 
     adata_sc = sc.read_h5ad(args.sc_path)
@@ -308,7 +311,7 @@ def main():
     # sc_dfs = {}
     sc_icms = {}
     sc_mean = {}
-    num_of_subsets = 20
+    num_of_subsets = 10
     subsets = create_subsets(markers_intersect, num_of_subsets=num_of_subsets)
     for ty in cell_types:
         # sc_dfs[ty] = []
@@ -567,7 +570,33 @@ if __name__ == "__main__":
         filename = f"logs/{filename}_{timestamp}.log"
         file_handler = logging.FileHandler(filename)
         logger.addHandler(file_handler)
+    mem_logger_fname = os.path.basename(args.st_path).replace(
+        ".h5ad", "_cpu_gpu_memlog.csv"
+    )
+    if os.path.isfile(mem_logger_fname):
+        os.remove(mem_logger_fname)
 
-    memory_snapshots = memory_usage(proc=main, interval=0.5)
-    max_memory = max(memory_snapshots)
-    logger.info(f"Total RAM usage [GB]: {(max_memory / 1000):.2f}")
+    logger_pid = subprocess.Popen(
+        [
+            "python",
+            "scripts/log_gpu_cpu_stats.py",
+            mem_logger_fname,
+        ]
+    )
+    print("Started logging compute utilisation")
+
+    main(args=args)
+
+    # End the background process logging the CPU and GPU utilisation.
+    logger_pid.terminate()
+    print("Terminated the compute utilisation logger background process")
+
+    # read cpu and gpu memory utilization
+    logger_df = pd.read_csv(mem_logger_fname)
+
+    max_cpu_mem = logger_df.loc[:, "RAM"].max()
+    max_gpu_mem = logger_df.loc[:, "GPU 0"].max()
+
+    logger.info(
+        f"Peak RAM Usage: {max_cpu_mem} MiB\nPeak GPU Usage: {max_gpu_mem} MiB\n"
+    )
