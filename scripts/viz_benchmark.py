@@ -23,7 +23,12 @@ for f in files:
     if not compare_CoDi_metrics:
         if ('CoDi' in f) and (not 'KLD' in f):
             continue
-    name = f.split('benchmark_')[-1].replace('.csv', '')
+    if compare_CoDi_metrics:
+        name = f.split('benchmark_CoDi_')[-1].replace('.csv', '')
+    else:
+        name = f.split('benchmark_')[-1].replace('.csv', '')
+        if name == "CoDi_KLD":
+            name = "CoDi"
     dfs[name] = pd.read_csv(f)
     sns.scatterplot(data=dfs[name], x='Subsample', y='Accuracy')
 plt.legend(labels=dfs.keys())
