@@ -55,7 +55,7 @@ def binary_distance(p, q):
     return np.sum(p.astype(bool) ^ q.astype(bool))
 
 
-def per_cell(ii, subsets, cell_types, st_df, sc_mean):
+def per_cell(ii, subsets, cell_types, st_df, sc_mean, sc_icms):
     best_matches_subsets = []
     for subset_id, subset in enumerate(subsets):
         best_match = {"cell_type": "", "dist": 9999999}
@@ -308,18 +308,15 @@ def main(args):
     # *****************************************
     # Precalculate necessary subset matrices
     # *****************************************
-    # sc_dfs = {}
     sc_icms = {}
     sc_mean = {}
     num_of_subsets = 10
     subsets = create_subsets(markers_intersect, num_of_subsets=num_of_subsets)
     for ty in cell_types:
-        # sc_dfs[ty] = []
         sc_icms[ty] = []
         sc_mean[ty] = []
         for sub_id, subset in enumerate(subsets):
             subset_df = sc_df[adata_sc.obs[args.annotation] == ty][subset]
-            # sc_dfs[ty].append(subset_df)
             if args.distance == "mahalanobis":
                 cm = np.cov(
                     subset_df.values, rowvar=False
@@ -345,7 +342,7 @@ def main(args):
         assigned_types = pool.starmap(
             per_cell,
             zip(
-                iis, repeat(subsets), repeat(cell_types), repeat(st_df), repeat(sc_mean)
+                iis, repeat(subsets), repeat(cell_types), repeat(st_df), repeat(sc_mean), repeat(sc_icms)
             ),
             chunksize=30,
         )
