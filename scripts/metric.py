@@ -2,7 +2,6 @@ import os
 import argparse as ap
 import logging
 import time
-import datetime
 from collections import Counter
 
 import scanpy as sc
@@ -10,9 +9,6 @@ import pandas as pd
 import numpy as np
 # import seaborn as sns
 # import matplotlib.pyplot as plt
-if not os.path.exists("logs"):
-    os.makedirs("logs")
-
 
 start_time = time.time()
 logging.basicConfig(
@@ -32,40 +28,30 @@ parser.add_argument(
     "--annotation",
     help="Annotation label for cell types",
     type=str,
-    required=True,
+    required=False,
+    default="cell_subclass",
+)
+parser.add_argument(
+    "-c",
+    "--annotation_st",
+    help="Annotation label for ST cell types",
+    type=str,
+    required=False,
+    default="celltype",
 )
 
 parser.add_argument(
     "--st_cell_type_path", help="CSV with spatially resolved dataset cell types", type=str, required=True
 )
-parser.add_argument(
-    "-c",
-    "--annotation_ct",
-    help="Annotation label for ST cell types provided by test algorithm.",
-    type=str,
-    required=False,
-    default=None,
-)
 
 
 args = parser.parse_args()
 
-filename = None
-timestamp = datetime.datetime.now().strftime("%d_%m_%Y_%H_%M")
-filename = os.path.basename(args.st_cell_type_path).replace(".h5ad", "")
-filename = f"logs/{filename}_{timestamp}.log"
-file_handler = logging.FileHandler(filename, mode='w+')
-logger.addHandler(file_handler)
-
 adata_sc = sc.read_h5ad(args.sc_path)
 adata_st = sc.read_h5ad(args.st_path)
 annotation = args.annotation
+annotation_st = args.annotation_st
 st_cell_type_path = args.st_cell_type_path
-if args.annotation_ct == None:
-    # if annotation is not provided it is expected to be the same as cell type file name suffix
-    annotation_ct = os.path.basename(st_cell_type_path).split("_")[-1].split(".")[0]
-else:
-    annotation_ct = args.annotation_ct
 
 if "markers_per_type_reduced_dict" not in adata_sc.uns:
     # Calculate marker genes
@@ -136,24 +122,19 @@ for col, genes in markers_per_type_top.items():
 
 # Read ST cell type annotations from CSV
 st_cell_types_df = pd.read_csv(st_cell_type_path)
-st_cell_types_df.rename(columns = {st_cell_types_df.columns[0]:'cell_id'}, inplace = True) 
-st_cell_types_df.set_index(st_cell_types_df.columns[0], inplace=True)
-
-# # In case of txt files with ordered results
-# st_cell_types_df = pd.read_csv(st_cell_type_path, header=None, names=['seurat'])
-# st_cell_types_df.index = adata_st.obs.index
-# st_cell_types_df.index.name = 'cell_id'
+st_cell_types_df.set_index(st_cell_types_df.columns[-2], inplace=True)
+st_annotation = st_cell_types_df.columns[-1]
 
 # Exclude cell types with less than <min_cells> cells
 min_cells = 5
-c = Counter(st_cell_types_df[annotation_ct])
+c = Counter(st_cell_types_df[st_cell_types_df.columns[-1]])
 exclude_types = {el for el in c.elements() if c[el] <= min_cells}
-st_cell_types_df.loc[:, annotation_ct] = st_cell_types_df[annotation_ct].apply(lambda x: x if x not in exclude_types else "FILTERED")
+st_cell_types_df.loc[:, st_cell_types_df.columns[-1]] = st_cell_types_df[st_cell_types_df.columns[-1]].apply(lambda x: x if x not in exclude_types else "FILTERED")
 
 # Add annotation from CSV to AnnData so we can calculate marker genes
 adata_st.obs = pd.merge(adata_st.obs, st_cell_types_df, left_index=True, right_index=True)
 
-adata_st = adata_st[adata_st.obs[annotation_ct] != "FILTERED"]
+adata_st = adata_st[adata_st.obs[st_annotation] != "FILTERED"]
 
 st_marker_time = time.time()
 marker_time = np.round(st_marker_time - start_time, 3)
@@ -167,7 +148,7 @@ sc.pp.filter_genes(adata_st, min_cells=5)
 sc.pp.normalize_total(adata_st, target_sum=1e4)
 sc.pp.log1p(adata_st)
 adata_st.var_names_make_unique()
-sc.tl.rank_genes_groups(adata_st, groupby=annotation_ct, use_raw=False)
+sc.tl.rank_genes_groups(adata_st, groupby=st_annotation, use_raw=False)
 markers_st_df = pd.DataFrame(adata_st.uns["rank_genes_groups"]["names"])
 markers_st = list(np.unique(markers_st_df.melt().value.values))
 pval_st_df = pd.DataFrame(adata_st.uns["rank_genes_groups"]["pvals_adj"])
