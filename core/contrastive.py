@@ -690,7 +690,7 @@ def contrastive_process(
 
     # preprocess(adata_sc)
     adata_sc = augment_data(
-        adata_sc, annotation=annotation_sc, percentage=augmentation_perc
+        adata_sc, adata_st, annotation=annotation_sc, percentage=augmentation_perc
     )
 
     # perform preprocessing like removing all 0 vectors, normalization and scaling
