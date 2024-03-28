@@ -396,14 +396,13 @@ if __name__ == "__main__":
     results_folder = (
         f'./results/cell2location_{os.path.basename(args.st_path).replace(".h5ad","")}/'
     )
-
     # create paths and names to results folders for reference regression and cell2location models
     ref_run_name = f"{results_folder}/reference_signatures"
     run_name = f"{results_folder}/cell2location_map"
 
-    if not os.path.exists(results_folder):
-        os.mkdir(results_folder)
     if args.plotting > 0:
+        if not os.path.exists(results_folder):
+            os.mkdir(results_folder)
         if not os.path.exists(ref_run_name):
             os.mkdir(ref_run_name)
         if not os.path.exists(run_name):
@@ -446,11 +445,11 @@ if __name__ == "__main__":
     logger_df = pd.read_csv(logger_fname)
 
     max_cpu_mem = logger_df.loc[:, "RAM"].max()
-    with open(os.path.basename(args.st_path).replace(".h5ad", "_cpumem.txt"), "w") as f:
-        f.write(f"Peak RAM Usage: {max_cpu_mem} MB\n")
-
     max_gpu_mem = logger_df.loc[:, "GPU 0"].max()
+
     with open(
-        os.path.basename(args.st_path).replace(".h5ad", "_gpumem.txt"), "w+"
+        os.path.basename(args.st_path).replace(".h5ad", "_cell2location_time_mem.txt"), "w+"
     ) as text_file:
-        text_file.write(f"GPU: {max_gpu_mem} MB used")
+        text_file.write(
+        f"Peak RAM Usage: {max_cpu_mem} MiB\nPeak GPU Usage: {max_gpu_mem} MiB\n Total time: {total_time:.4f} s"
+    )
