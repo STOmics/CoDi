@@ -5,8 +5,23 @@ import random
 import pandas as pd
 
 
+def auto_augmentation_perc_estimation(adata_sc: ad.AnnData, adata_st: ad.AnnData):
+    """Perform auto calculation of augmentation percentage.
+
+    Ratio between sc and st expression sparsity is used to calculate appropriate dropout percentage.
+
+    Args:
+        adata_sc: _description_
+        adata_st: _description_
+    """
+    st_exp_mean = np.mean((adata_st.X != 0).sum(axis=1))
+    sc_exp_mean = np.mean((adata_sc.X != 0).sum(axis=1))
+    perc = np.round((sc_exp_mean - st_exp_mean) / sc_exp_mean, 2)
+    return perc if perc > 0 else 0
+
+
 def normalize(max_count, min_count, new_max, new_min, num):
-    """Normalization to new count values
+    """Normalization to new count values.
 
     Args:
         max_count: Max number of some celltype in original dataset
@@ -22,17 +37,26 @@ def normalize(max_count, min_count, new_max, new_min, num):
     return int(norm * (new_max - new_min) + new_min)
 
 
-def augment_data(adata_sc: ad.AnnData, annotation: str, percentage: float):
-    """Scale original gene expression abundance to fit 0.25-0.75 of maximum celltype count and augment
+def augment_data(
+    adata_sc: ad.AnnData,
+    adata_st: ad.AnnData,
+    annotation: str,
+    percentage: float = None,
+):
+    """Scale original gene expression abundance to fit 0.25-0.75 of maximum celltype count and augment.
 
     Augmentation is performed by setting a percentage of non-zero gene counts to zero to
     better resemble ST data.
 
     Args:
-        adata: AnnData object that contains SC gene expression and annotation
+        adata_sc: AnnData object with SC gene exp and annotation
+        adata_st: AnnData object with ST gene exp used in case of auto percentage calculation
         annotation: Column in adata.obs that represents cell type annotation
         percentage: A percentage of genes with non-zero counts that will be set to zero
     """
+    if percentage is None:
+        percentage = auto_augmentation_perc_estimation(adata_sc, adata_st)
+
     counts_per_ct = adata_sc.obs[annotation].value_counts().values
     cts = list(adata_sc.obs[annotation].value_counts().index)
     max_count, min_count = max(counts_per_ct), min(counts_per_ct)

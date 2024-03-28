@@ -343,7 +343,12 @@ def main(args):
         assigned_types = pool.starmap(
             per_cell,
             zip(
-                iis, repeat(subsets), repeat(cell_types), repeat(st_df), repeat(sc_mean), repeat(sc_icms)
+                iis,
+                repeat(subsets),
+                repeat(cell_types),
+                repeat(st_df),
+                repeat(sc_mean),
+                repeat(sc_icms),
             ),
             chunksize=30,
         )
@@ -531,10 +536,10 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "--augmentation_perc",
-        help="Contrastive: Percentage for the augmentation of SC data. Defaults to 0.7.",
+        help="Contrastive: Percentage for the augmentation of SC data. If not provided it will be calculated automatically. Defaults to None.",
         type=float,
         required=False,
-        default=0.7,
+        default=None,
     )
     parser.add_argument(
         "--n_jobs",
