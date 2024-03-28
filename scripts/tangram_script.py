@@ -1,4 +1,7 @@
 import os
+import time
+import subprocess
+
 import warnings
 import argparse as ap
 import scanpy as sc
@@ -9,11 +12,14 @@ import tangram as tg
 
 
 if __name__ == '__main__':
+    start_time = time.perf_counter()
+    
     parser = ap.ArgumentParser(description='A script that performs Tangram cell type annotation on ST data, given an SC reference.')
     parser.add_argument('--sc_path', help='Path to .h5ad file with scRNA data.', type=str, required=True)
     parser.add_argument('--st_path', help='Path to .h5ad file with ST data.', type=str, required=True)
     parser.add_argument('-a','--annotation', help='Label of SC .obs column containing SC cell types', type=str, required=True)
     parser.add_argument('--annotation_st', help='Label of ST .obs column containing ST cell types', type=str, required=False, default=None)
+    parser.add_argument('--num_epochs', help='Number of epochs for mapping process.', type=int, required=False, default=500)
     parser.add_argument('--common_ct', help='Flag indicating that only cell types existing in ST should be used from SC.', required=False, default=False, action='store_true')
     parser.add_argument('--plotting', help='Level of plotting (images are saved). 0 - none, >0 - spatial plots', type=int, required=False, default=0)
     parser.add_argument('--spot_size', help='Spot size for plotting', type=float, required=False, default=30)
@@ -22,6 +28,21 @@ if __name__ == '__main__':
     
     if args.common_ct == True and args.annotation_st == None:
         raise ValueError("ST annotation label is needed for finding intersection of cell types.")
+
+    mem_logger_fname = os.path.basename(args.st_path).replace(
+        ".h5ad", "_cpu_gpu_memlog.csv"
+    )
+    if os.path.isfile(mem_logger_fname):
+        os.remove(mem_logger_fname)
+
+    logger_pid = subprocess.Popen(
+        [
+            "python",
+            "scripts/log_gpu_cpu_stats.py",
+            mem_logger_fname,
+        ]
+    )
+    print("Started logging compute utilisation")
 
     # read the .h5ad files
     adata_sc = sc.read(args.sc_path)
@@ -78,7 +99,7 @@ if __name__ == '__main__':
         mode="clusters",
         cluster_label='cell_subclass',  # .obs field w cell types
         density_prior='uniform',
-        num_epochs=500,
+        num_epochs=args.num_epochs,
         # device="cuda:0",
         device='cpu',
     )
@@ -95,6 +116,27 @@ if __name__ == '__main__':
     adata_st.obs.index.name = 'cell_id'
     adata_st.obs[["tangram"]].to_csv(os.path.basename(args.st_path).replace(".h5ad", "_tangram.csv"))
     adata_st.write_h5ad(os.path.basename(args.st_path).replace(".h5ad", "_tangram.h5ad"))
+
+    # record execution time
+    end_time = time.perf_counter()
+    total_time = end_time - start_time
+
+    # End the background process logging the CPU and GPU utilisation.
+    logger_pid.terminate()
+    print("Terminated the compute utilisation logger background process")
+
+    # read cpu and gpu memory utilization
+    logger_df = pd.read_csv(mem_logger_fname)
+
+    max_cpu_mem = logger_df.loc[:, "RAM"].max()
+    max_gpu_mem = logger_df.loc[:, "GPU 0"].max()
+
+    with open(
+        os.path.basename(args.st_path).replace(".h5ad", "_tangram_time_mem.txt"), "w+"
+    ) as text_file:
+        text_file.write(
+        f"Peak RAM Usage: {max_cpu_mem} MiB\nPeak GPU Usage: {max_gpu_mem} MiB\n Total time: {total_time:.4f} s"
+    )
 
     # plot the mapping results compared to ST annotation
     if args.plotting > 0:
