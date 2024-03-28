@@ -289,11 +289,11 @@ class ContrastiveEncoder(BaseEstimator, TransformerMixin):
             Args:
                 num_of_negatives (int, optional): number of random negative samples picket randomply from endpoint group
                                                   oposite to anchor.Defaults to 2.
-                batch_size (int, optional): number of samples in the batch. Defaults to 16.
-                epochs (int, optional): number of to train deep encoder. Defaults to 500.
+                batch_size (int, optional): number of samples in the batch. Defaults to 512.
+                epochs (int, optional): number of to train deep encoder. Defaults to 50.
                 emb_dim (int, optional): Dimension of the output embeddings. Defaults to 16.
-                encoder_depth (int, optional): Number of layers in the input MLP layer
-                classifier_depth (int, optional): Number of layers in the classifier MLP layer
+                encoder_depth (int, optional): Number of layers in the input MLP layer. Defaults to 4.
+                classifier_depth (int, optional): Number of layers in the classifier MLP layer. Defaults to 2.
                 contrastive_only_perc (float [0, 1], optional): % of epochs to use only contrastive loss for training
                 contrastive_weight (float [0, 1], optional): Weight of contrastive loss  when combined in cross-entropy
                                                              loss of logistic regression with formula:
@@ -302,6 +302,7 @@ class ContrastiveEncoder(BaseEstimator, TransformerMixin):
                                                     contrastive_only_perc of epochs.
                 freeze_hidden (Boolean, optional): Freeze weights of hidden layer (Multy-Layer Perceptron) after
                                                    contrastive_only_perc of epochs.
+                out_dim (int, optional): Dimension of the output result. Defaults to 1.
         """
         self.num_of_negatives = num_of_negatives
         self.batch_size = batch_size
@@ -673,6 +674,7 @@ def contrastive_process(
     adata_sc: ad.AnnData,
     adata_st: ad.AnnData,
     annotation_sc: str,
+    batch_size: int,
     epochs: int,
     embedding_dim: int,
     encoder_depth: int,
@@ -705,6 +707,7 @@ def contrastive_process(
 
     ce = ContrastiveEncoder(
         out_dim=len(le.classes_),
+        batch_size=batch_size,
         epochs=epochs,
         emb_dim=embedding_dim,
         encoder_depth=encoder_depth,

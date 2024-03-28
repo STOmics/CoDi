@@ -228,6 +228,7 @@ def main(args):
                 adata_sc=adata_sc[:, markers_intersect],
                 adata_st=adata_st[:, markers_intersect],
                 annotation_sc=args.annotation,
+                batch_size=args.batch_size,
                 epochs=args.epochs,
                 embedding_dim=args.emb_dim,
                 encoder_depth=args.enc_depth,
