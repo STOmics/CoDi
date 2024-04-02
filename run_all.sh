@@ -11,7 +11,7 @@ conda activate CoDi_env
 python CoDi.py --st_path /goofys/Samples/Stereo_seq/Mouse_brain/SS200000141TL_B5_pruned_inplace.h5ad --sc_path /goofys/Samples/sc_reference/mouse_brain_L5_csr.h5ad  -a cell_subclass --n_jobs 50 --num_markers 50 --contrastive --batch_size 2700 --epochs 300 --emb_dim 64 --verbose
 
 # # Mouse brain 16.5 stereo-seq (sim anno)
-python CoDi.py --st_path /goofys/Samples/Stereo_seq/E16.5_E1S3_cell_bin_whole_brain_noborderct_unlog1p_pruned_inplace.h5ad --sc_path /goofys/Samples/sc_reference/mouse_brain_L5_csr.h5ad  -a cell_subclass --n_jobs 50 --num_markers 50 --contrastive --batch_size 15000 --epochs 300 --emb_dim 64 --verbose
+python CoDi.py --st_path /goofys/Samples/Stereo_seq/E16.5_E1S3_cell_bin_whole_brain_noborderct_unlog1p_pruned_inplace.h5ad --sc_path /goofys/Samples/sc_reference/mouse_brain_L5_csr.h5ad  -a cell_subclass --n_jobs 50 --num_markers 50 --contrastive --batch_size 2700 --epochs 300 --emb_dim 64 --verbose
 
 # # Mouse brain visium 40K cells
 python CoDi.py --st_path /goofys/Samples/10X/mouse_brain_visium_cell2location_pruned_inplace.h5ad --sc_path /goofys/projects/SSI/datasets/mouse_brain_visium_cell2location/visium_mouse_brain_cell2location_sc_unlog1p_pruned_inplace.h5ad -a annotation_1 --n_jobs 50 --contrastive --batch_size 2700 --epochs 300 --emb_dim 64 --verbose
