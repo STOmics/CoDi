@@ -2,6 +2,7 @@ import anndata as ad
 from scipy.sparse import csr_matrix
 import numpy as np
 import random
+import logging
 import pandas as pd
 
 
@@ -42,6 +43,7 @@ def augment_data(
     adata_st: ad.AnnData,
     annotation: str,
     percentage: float = None,
+    logger: logging = None,
 ):
     """Scale original gene expression abundance to fit 0.25-0.75 of maximum celltype count and augment.
 
@@ -56,6 +58,7 @@ def augment_data(
     """
     if percentage is None:
         percentage = auto_augmentation_perc_estimation(adata_sc, adata_st)
+        logger.info(f"Auto calculated augmentation percentage is {percentage}\n")
 
     counts_per_ct = adata_sc.obs[annotation].value_counts().values
     cts = list(adata_sc.obs[annotation].value_counts().index)
