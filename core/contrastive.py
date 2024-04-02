@@ -403,7 +403,7 @@ class ContrastiveEncoder(BaseEstimator, TransformerMixin):
 
         best_val_loss = float("inf")
         no_improvement_count = 0
-        PATIENCE = 5
+        PATIENCE = 15
 
         # scaler = GradScaler()
 
@@ -692,7 +692,7 @@ def contrastive_process(
 
     # preprocess(adata_sc)
     adata_sc = augment_data(
-        adata_sc, adata_st, annotation=annotation_sc, percentage=augmentation_perc
+        adata_sc, adata_st, annotation=annotation_sc, percentage=augmentation_perc, logger=logger
     )
 
     # perform preprocessing like removing all 0 vectors, normalization and scaling
