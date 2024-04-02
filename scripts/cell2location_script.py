@@ -432,10 +432,6 @@ if __name__ == "__main__":
     end_time = time.perf_counter()
     total_time = end_time - start_time
     print(f"Total execution time of cell2location: {total_time:.4f} s")
-    with open(
-        os.path.basename(args.st_path).replace(".h5ad", "_time.txt"), "w"
-    ) as text_file:
-        text_file.write(f"Total execution time of cell2location: {total_time:.4f} s")
 
     # End the background process logging the CPU and GPU utilisation.
     logger_pid.terminate()
@@ -446,6 +442,9 @@ if __name__ == "__main__":
 
     max_cpu_mem = logger_df.loc[:, "RAM"].max()
     max_gpu_mem = logger_df.loc[:, "GPU 0"].max()
+    
+    print(f"Peak RAM usage of cell2location: {max_cpu_mem} MiB")
+    print(f"Peak GPU usage of cell2location: {max_gpu_mem} MiB")
 
     with open(
         os.path.basename(args.st_path).replace(".h5ad", "_cell2location_time_mem.txt"), "w+"
