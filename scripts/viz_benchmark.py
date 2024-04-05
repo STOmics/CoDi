@@ -6,6 +6,7 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 
 dataset_prefix = "config_40k_visium"
+dataset_prefix = "config_breast"
 dataset_name = dataset_prefix.rsplit('config_')[1]
 compare_CoDi_metrics = False
 output_suffix = ''

@@ -16,6 +16,6 @@
     "results_dir": "/goofys/projects/SSI/testing/synthetic/breast/sn_atlas/tangram,/goofys/projects/SSI/testing/synthetic/breast/sn_atlas/cell2location,/goofys/projects/SSI/testing/synthetic/breast/sn_atlas/CoDi",
 
     "annotation": "Cell types level 2",
-    "output_suffix": "tangram, cell2location, CoDi",
+    "output_suffix": "tangram,cell2location,CoDi",
     "distance_metric": "KLD"
 }

@@ -104,7 +104,5 @@ for results_dir, algo_suffix in zip(results_dir_all, algo_suffix_all):
     print('Writing ' + out_file_name)
 end = time.time()
 print(f"benchmark_from_results.py took: {end-start}s")
-with open(os.path.basename(out_file_name).replace(".csv", ".txt"), "w") as text_file:
-    text_file.write(f"benchmark)from_results.py took: {end-start}s")
 
 
