@@ -25,11 +25,11 @@ try:
 except (NameError, FileNotFoundError) as error:
     print("Please add JSON with configuration!")
     exit(1)
-results_dir = config["results_dir"]
+results_dir_all = config["results_dir"].split(',')
 hq_path = config["hq_path"]
 lq_paths = config["lq_paths"]
 annotation = config["annotation"]
-algo_suffix = config["output_suffix"]
+algo_suffix_all = config["output_suffix"].split(',')
 distance_metric = config["distance_metric"]
 
 start = time.time()
@@ -59,47 +59,52 @@ def calc_metric(actual_labels, pred, ind):
     )
     return results_df
 
-
-out_df = pd.DataFrame()
-for lq_path in lq_paths:
-    print(f"Processing {lq_path}")
-
-    if algo_suffix == "CoDi":
-        lq_path_pred = os.path.join(
-            results_dir, os.path.basename(lq_path).replace(
-                ".h5ad", f"_{algo_suffix}_{distance_metric}.h5ad"
+for results_dir, algo_suffix in zip(results_dir_all, algo_suffix_all):
+    print('*'*30, algo_suffix) 
+    out_df = pd.DataFrame()
+    for lq_path in lq_paths:
+        print(f"Processing {lq_path}")
+    
+        if algo_suffix == "CoDi":
+            lq_path_pred = os.path.join(
+                results_dir, os.path.basename(lq_path).replace(
+                    ".h5ad", f"_{algo_suffix}_{distance_metric}.h5ad"
+                )
             )
-        )
-        subsample_factor_pos = -3
-        out_file_name = f"{sys.argv[1].split('.')[0]}_benchmark_{algo_suffix}_{distance_metric}.csv"
-    else:
-        lq_path_pred = os.path.join(
-            results_dir, os.path.basename(lq_path).replace(
-                ".h5ad", f"_{algo_suffix}.h5ad"
+            subsample_factor_pos = -3
+            out_file_name = f"{sys.argv[1].split('.')[0]}_benchmark_{algo_suffix}_{distance_metric}.csv"
+        else:
+            lq_path_pred = os.path.join(
+                results_dir, os.path.basename(lq_path).replace(
+                    ".h5ad", f"_{algo_suffix}.h5ad"
+                )
             )
+            subsample_factor_pos = -2
+            out_file_name = f"{sys.argv[1].split('.')[0]}_benchmark_{algo_suffix}.csv"
+        if not os.path.exists(lq_path_pred):
+            # raise ValueError(f"no file {lq_path_pred}")
+            print(f"no file {lq_path_pred}")
+            continue
+        print('Reading ' + lq_path_pred)
+        adata_st = sc.read_h5ad(lq_path_pred)
+
+        adata_st.var_names_make_unique()
+        subsample_factor = (
+            lq_path_pred.split("_")[subsample_factor_pos]
+            if is_number(lq_path_pred.split("_")[subsample_factor_pos])
+            else 0.0
         )
-        subsample_factor_pos = -2
-        out_file_name = f"{sys.argv[1].split('.')[0]}_benchmark_{algo_suffix}.csv"
-    if not os.path.exists(lq_path_pred):
-        raise ValueError(f"no file {lq_path_pred}")
-    print(lq_path_pred)
-    adata_st = sc.read_h5ad(lq_path_pred)
-    print(adata_st.obs)
-    adata_st.var_names_make_unique()
-    subsample_factor = (
-        lq_path_pred.split("_")[subsample_factor_pos]
-        if is_number(lq_path_pred.split("_")[subsample_factor_pos])
-        else 0.0
-    )
-    res_df = calc_metric(
-        adata_sc.obs[annotation], adata_st.obs[f'{algo_suffix}'], subsample_factor
-    )
-    out_df = pd.concat([out_df, res_df])
-    print(out_df)
-out_df = out_df.reset_index(drop=True)
-out_df.to_csv(out_file_name)
+        res_df = calc_metric(
+            adata_sc.obs[annotation], adata_st.obs[f'{algo_suffix}'], subsample_factor
+        )
+        out_df = pd.concat([out_df, res_df])
+        print(out_df)
+    out_df = out_df.reset_index(drop=True)
+    out_df.to_csv(out_file_name)
+    print('Writing ' + out_file_name)
 end = time.time()
 print(f"benchmark_from_results.py took: {end-start}s")
 with open(os.path.basename(out_file_name).replace(".csv", ".txt"), "w") as text_file:
     text_file.write(f"benchmark)from_results.py took: {end-start}s")
+
 
