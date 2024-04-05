@@ -1,0 +1,23 @@
+{
+    "lq_paths": [
+            "/goofys/Samples/sc_reference/mouse_kidney/GSE157079_P0_adult.h5ad",
+            "/goofys/Samples/sc_reference/mouse_kidney/GSE157079_P0_adult_0.05.h5ad",
+            "/goofys/Samples/sc_reference/mouse_kidney/GSE157079_P0_adult_0.1.h5ad",
+            "/goofys/Samples/sc_reference/mouse_kidney/GSE157079_P0_adult_0.2.h5ad",
+            "/goofys/Samples/sc_reference/mouse_kidney/GSE157079_P0_adult_0.3.h5ad",
+            "/goofys/Samples/sc_reference/mouse_kidney/GSE157079_P0_adult_0.5.h5ad",
+            "/goofys/Samples/sc_reference/mouse_kidney/GSE157079_P0_adult_0.6.h5ad",
+            "/goofys/Samples/sc_reference/mouse_kidney/GSE157079_P0_adult_0.7.h5ad",
+            "/goofys/Samples/sc_reference/mouse_kidney/GSE157079_P0_adult_0.8.h5ad",
+            "/goofys/Samples/sc_reference/mouse_kidney/GSE157079_P0_adult_0.9.h5ad"
+    ],
+    "hq_path": "/goofys/Samples/sc_reference/mouse_kidney/GSE157079_P0_adult.h5ad",
+    "results_dir_CoDi": "/goofys/projects/SSI/testing/synthetic/mouse_kidney_sub/CoDi",
+    "results_dir_seurat": "/goofys/projects/SSI/testing/synthetic/mouse_kidney_sub/seurat",
+    "results_dir_tangram": "/goofys/projects/SSI/testing/synthetic/mouse_kidney_sub/tangram_new",
+    "results_dir_cytospace": "/goofys/projects/SSI/testing/synthetic/mouse_kidney_sub/cytospace",
+    "results_dir_cell2location": "/goofys/projects/SSI/testing/synthetic/mouse_kidney_sub/cell2location",
+    "annotation": "clusters",
+    "output_suffix": "CoDi",
+    "distance_metric": "KLD"
+}
