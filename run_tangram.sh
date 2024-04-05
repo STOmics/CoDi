@@ -50,7 +50,7 @@ conda activate tangram-env
 ## visium mouse brain subsampled - TANGRAM
 ##------------------------------------------------##
 
-python scripts/tangram_script.py --st_path /goofys/projects/SSI/datasets/mouse_brain_visium_cell2location/synthetic_sc.h5ad --sc_path /goofys/projects/SSI/datasets/mouse_brain_visium_cell2location/synthetic_sc.h5ad -a annotation_1 --annotation_st annotation_1
+#python scripts/tangram_script.py --st_path /goofys/projects/SSI/datasets/mouse_brain_visium_cell2location/synthetic_sc.h5ad --sc_path /goofys/projects/SSI/datasets/mouse_brain_visium_cell2location/synthetic_sc.h5ad -a annotation_1 --annotation_st annotation_1
 
 # python scripts/tangram_script.py --st_path /goofys/projects/SSI/datasets/mouse_brain_visium_cell2location/synthetic_sc_0.05.h5ad --sc_path /goofys/projects/SSI/datasets/mouse_brain_visium_cell2location/synthetic_sc.h5ad -a annotation_1 --annotation_st annotation_1
 
@@ -59,6 +59,8 @@ python scripts/tangram_script.py --st_path /goofys/projects/SSI/datasets/mouse_b
 # python scripts/tangram_script.py --st_path /goofys/projects/SSI/datasets/mouse_brain_visium_cell2location/synthetic_sc_0.2.h5ad --sc_path /goofys/projects/SSI/datasets/mouse_brain_visium_cell2location/synthetic_sc.h5ad -a annotation_1 --annotation_st annotation_1
 
 # python scripts/tangram_script.py --st_path /goofys/projects/SSI/datasets/mouse_brain_visium_cell2location/synthetic_sc_0.3.h5ad --sc_path /goofys/projects/SSI/datasets/mouse_brain_visium_cell2location/synthetic_sc.h5ad -a annotation_1 --annotation_st annotation_1
+
+# python scripts/tangram_script.py --st_path /goofys/projects/SSI/datasets/mouse_brain_visium_cell2location/synthetic_sc_0.4.h5ad --sc_path /goofys/projects/SSI/datasets/mouse_brain_visium_cell2location/synthetic_sc.h5ad -a annotation_1 --annotation_st annotation_1
 
 # python scripts/tangram_script.py --st_path /goofys/projects/SSI/datasets/mouse_brain_visium_cell2location/synthetic_sc_0.5.h5ad --sc_path /goofys/projects/SSI/datasets/mouse_brain_visium_cell2location/synthetic_sc.h5ad -a annotation_1 --annotation_st annotation_1
 
@@ -69,3 +71,39 @@ python scripts/tangram_script.py --st_path /goofys/projects/SSI/datasets/mouse_b
 # python scripts/tangram_script.py --st_path /goofys/projects/SSI/datasets/mouse_brain_visium_cell2location/synthetic_sc_0.8.h5ad --sc_path /goofys/projects/SSI/datasets/mouse_brain_visium_cell2location/synthetic_sc.h5ad -a annotation_1 --annotation_st annotation_1
 
 # python scripts/tangram_script.py --st_path /goofys/projects/SSI/datasets/mouse_brain_visium_cell2location/synthetic_sc_0.9.h5ad --sc_path /goofys/projects/SSI/datasets/mouse_brain_visium_cell2location/synthetic_sc.h5ad -a annotation_1 --annotation_st annotation_1
+
+##------------------------------------------------##
+## snRNA cell atlas - TANGRAM
+##------------------------------------------------##
+
+python scripts/tangram_script.py --st_path /goofys/Samples/sc_reference/single_nucleus_cell_atlas/GTEX-1HSMQ-5005.h5ad --sc_path /goofys/Samples/sc_reference/single_nucleus_cell_atlas/GTEX-1HSMQ-5005.h5ad -a "Cell types level 2" --annotation_st "Cell types level 2"
+echo ************************* 0.05
+python scripts/tangram_script.py --st_path /goofys/Samples/sc_reference/single_nucleus_cell_atlas/GTEX-1HSMQ-5005_0.05.h5ad --sc_path /goofys/Samples/sc_reference/single_nucleus_cell_atlas/GTEX-1HSMQ-5005.h5ad -a "Cell types level 2" --annotation_st "Cell types level 2"
+echo ************************* 0.1
+python scripts/tangram_script.py --st_path /goofys/Samples/sc_reference/single_nucleus_cell_atlas/GTEX-1HSMQ-5005_0.1.h5ad --sc_path /goofys/Samples/sc_reference/single_nucleus_cell_atlas/GTEX-1HSMQ-5005.h5ad -a "Cell types level 2" --annotation_st "Cell types level 2"
+echo ************************* 0.2
+python scripts/tangram_script.py --st_path /goofys/Samples/sc_reference/single_nucleus_cell_atlas/GTEX-1HSMQ-5005_0.2.h5ad --sc_path /goofys/Samples/sc_reference/single_nucleus_cell_atlas/GTEX-1HSMQ-5005.h5ad -a "Cell types level 2" --annotation_st "Cell types level 2"
+echo ************************* 0.3
+python scripts/tangram_script.py --st_path /goofys/Samples/sc_reference/single_nucleus_cell_atlas/GTEX-1HSMQ-5005_0.3.h5ad --sc_path /goofys/Samples/sc_reference/single_nucleus_cell_atlas/GTEX-1HSMQ-5005.h5ad -a "Cell types level 2" --annotation_st "Cell types level 2"
+echo ************************* 0.4
+python scripts/tangram_script.py --st_path /goofys/Samples/sc_reference/single_nucleus_cell_atlas/GTEX-1HSMQ-5005_0.4.h5ad --sc_path /goofys/Samples/sc_reference/single_nucleus_cell_atlas/GTEX-1HSMQ-5005.h5ad -a "Cell types level 2" --annotation_st "Cell types level 2"
+echo ************************* 0.5
+python scripts/tangram_script.py --st_path /goofys/Samples/sc_reference/single_nucleus_cell_atlas/GTEX-1HSMQ-5005_0.5.h5ad --sc_path /goofys/Samples/sc_reference/single_nucleus_cell_atlas/GTEX-1HSMQ-5005.h5ad -a "Cell types level 2" --annotation_st "Cell types level 2"
+echo ************************* 0.6
+python scripts/tangram_script.py --st_path /goofys/Samples/sc_reference/single_nucleus_cell_atlas/GTEX-1HSMQ-5005_0.6.h5ad --sc_path /goofys/Samples/sc_reference/single_nucleus_cell_atlas/GTEX-1HSMQ-5005.h5ad -a "Cell types level 2" --annotation_st "Cell types level 2"
+echo ************************* 0.7
+python scripts/tangram_script.py --st_path /goofys/Samples/sc_reference/single_nucleus_cell_atlas/GTEX-1HSMQ-5005_0.7.h5ad --sc_path /goofys/Samples/sc_reference/single_nucleus_cell_atlas/GTEX-1HSMQ-5005.h5ad -a "Cell types level 2" --annotation_st "Cell types level 2"
+echo ************************* 0.8
+python scripts/tangram_script.py --st_path /goofys/Samples/sc_reference/single_nucleus_cell_atlas/GTEX-1HSMQ-5005_0.8.h5ad --sc_path /goofys/Samples/sc_reference/single_nucleus_cell_atlas/GTEX-1HSMQ-5005.h5ad -a "Cell types level 2" --annotation_st "Cell types level 2"
+echo ************************* 0.9
+python scripts/tangram_script.py --st_path /goofys/Samples/sc_reference/single_nucleus_cell_atlas/GTEX-1HSMQ-5005_0.9.h5ad --sc_path /goofys/Samples/sc_reference/single_nucleus_cell_atlas/GTEX-1HSMQ-5005.h5ad -a "Cell types level 2" --annotation_st "Cell types level 2"
+
+
+
+
+
+
+
+
+
+

@@ -7,17 +7,17 @@ conda activate CoDi_env
 ## 4 ST test pairs
 ##------------------------------------------------##
 
-# Adult mouse brain stereo-seq (celltype_pred)
-python CoDi.py --st_path /goofys/Samples/Stereo_seq/Mouse_brain/SS200000141TL_B5_pruned_inplace.h5ad --sc_path /goofys/Samples/sc_reference/mouse_brain_L5_csr.h5ad  -a cell_subclass --n_jobs 50 --num_markers 50 --contrastive --batch_size 2700 --epochs 300 --emb_dim 64 --verbose
+# # Adult mouse brain stereo-seq (celltype_pred)
+# python CoDi.py --st_path /goofys/Samples/Stereo_seq/Mouse_brain/SS200000141TL_B5_pruned_inplace.h5ad --sc_path /goofys/Samples/sc_reference/mouse_brain_L5_csr.h5ad  -a cell_subclass --n_jobs 50 --num_markers 50 --contrastive --batch_size 2700 --epochs 300 --emb_dim 64 --verbose
 
-# # Mouse brain 16.5 stereo-seq (sim anno)
-python CoDi.py --st_path /goofys/Samples/Stereo_seq/E16.5_E1S3_cell_bin_whole_brain_noborderct_unlog1p_pruned_inplace.h5ad --sc_path /goofys/Samples/sc_reference/mouse_brain_L5_csr.h5ad  -a cell_subclass --n_jobs 50 --num_markers 50 --contrastive --batch_size 2700 --epochs 300 --emb_dim 64 --verbose
+# # # Mouse brain 16.5 stereo-seq (sim anno)
+# python CoDi.py --st_path /goofys/Samples/Stereo_seq/E16.5_E1S3_cell_bin_whole_brain_noborderct_unlog1p_pruned_inplace.h5ad --sc_path /goofys/Samples/sc_reference/mouse_brain_L5_csr.h5ad  -a cell_subclass --n_jobs 50 --num_markers 50 --contrastive --batch_size 2700 --epochs 300 --emb_dim 64 --verbose
 
-# # Mouse brain visium 40K cells
-python CoDi.py --st_path /goofys/Samples/10X/mouse_brain_visium_cell2location_pruned_inplace.h5ad --sc_path /goofys/projects/SSI/datasets/mouse_brain_visium_cell2location/visium_mouse_brain_cell2location_sc_unlog1p_pruned_inplace.h5ad -a annotation_1 --n_jobs 50 --contrastive --batch_size 2700 --epochs 300 --emb_dim 64 --verbose
+# # # Mouse brain visium 40K cells
+# python CoDi.py --st_path /goofys/Samples/10X/mouse_brain_visium_cell2location_pruned_inplace.h5ad --sc_path /goofys/projects/SSI/datasets/mouse_brain_visium_cell2location/visium_mouse_brain_cell2location_sc_unlog1p_pruned_inplace.h5ad -a annotation_1 --n_jobs 50 --contrastive --batch_size 2700 --epochs 300 --emb_dim 64 --verbose
 
 # # Mouse kidney 43636x31053
-python CoDi.py --st_path /goofys/Samples/slide_seq/cellxgene_kidney_slide_seq_v2/Puck_191223_19_corr_pruned_inplace.h5ad --sc_path /goofys/Samples/sc_reference/mouse_kidney/GSE157079_P0_adult.h5ad -a clusters --n_jobs 50 --contrastive --batch_size 2700 --epochs 300 --emb_dim 64 --verbose
+# python CoDi.py --st_path /goofys/Samples/slide_seq/cellxgene_kidney_slide_seq_v2/Puck_191223_19_corr_pruned_inplace.h5ad --sc_path /goofys/Samples/sc_reference/mouse_kidney/GSE157079_P0_adult.h5ad -a clusters --n_jobs 50 --contrastive --batch_size 2700 --epochs 300 --emb_dim 64 --verbose
 
 ##------------------------------------------------##
 ##------------------------------------------------##
@@ -77,6 +77,7 @@ python CoDi.py --st_path /goofys/Samples/slide_seq/cellxgene_kidney_slide_seq_v2
 # python CoDi.py --st_path /goofys/projects/SSI/datasets/mouse_brain_visium_cell2location/synthetic_sc_0.2.h5ad --sc_path /goofys/projects/SSI/datasets/mouse_brain_visium_cell2location/synthetic_sc.h5ad -a annotation_1 --epochs 300 --emb_dim 64 --batch_size 2700 --contrastive --n_jobs 50 --verbose
 
 # python CoDi.py --st_path /goofys/projects/SSI/datasets/mouse_brain_visium_cell2location/synthetic_sc_0.3.h5ad --sc_path /goofys/projects/SSI/datasets/mouse_brain_visium_cell2location/synthetic_sc.h5ad -a annotation_1 --epochs 300 --emb_dim 64 --batch_size 2700 --contrastive --n_jobs 50 --verbose
+# python CoDi.py --st_path /goofys/projects/SSI/datasets/mouse_brain_visium_cell2location/synthetic_sc_0.4.h5ad --sc_path /goofys/projects/SSI/datasets/mouse_brain_visium_cell2location/synthetic_sc.h5ad -a annotation_1 --epochs 300 --emb_dim 64 --batch_size 2700 --contrastive --n_jobs 50 --verbose
 
 # python CoDi.py --st_path /goofys/projects/SSI/datasets/mouse_brain_visium_cell2location/synthetic_sc_0.5.h5ad --sc_path /goofys/projects/SSI/datasets/mouse_brain_visium_cell2location/synthetic_sc.h5ad -a annotation_1 --epochs 300 --emb_dim 64 --batch_size 2700 --contrastive --n_jobs 50 --verbose
 
@@ -87,3 +88,29 @@ python CoDi.py --st_path /goofys/Samples/slide_seq/cellxgene_kidney_slide_seq_v2
 # python CoDi.py --st_path /goofys/projects/SSI/datasets/mouse_brain_visium_cell2location/synthetic_sc_0.8.h5ad --sc_path /goofys/projects/SSI/datasets/mouse_brain_visium_cell2location/synthetic_sc.h5ad -a annotation_1 --epochs 300 --emb_dim 64 --batch_size 2700 --contrastive --n_jobs 50 --verbose
 
 # python CoDi.py --st_path /goofys/projects/SSI/datasets/mouse_brain_visium_cell2location/synthetic_sc_0.9.h5ad --sc_path /goofys/projects/SSI/datasets/mouse_brain_visium_cell2location/synthetic_sc.h5ad -a annotation_1 --epochs 300 --emb_dim 64 --batch_size 2700 --contrastive --n_jobs 50 --verbose
+
+##------------------------------------------------##
+## snRNA cell atlas
+##------------------------------------------------##
+python CoDi.py --st_path /goofys/Samples/sc_reference/single_nucleus_cell_atlas/GTEX-1HSMQ-5005.h5ad --sc_path /goofys/Samples/sc_reference/single_nucleus_cell_atlas/GTEX-1HSMQ-5005.h5ad -a "Cell types level 2"  --epochs 300 --emb_dim 64 --batch_size 2700 --n_jobs 50 --verbose >> out.log
+echo ************************* 0.05
+python CoDi.py --st_path /goofys/Samples/sc_reference/single_nucleus_cell_atlas/GTEX-1HSMQ-5005_0.05.h5ad --sc_path /goofys/Samples/sc_reference/single_nucleus_cell_atlas/GTEX-1HSMQ-5005.h5ad -a "Cell types level 2"  --epochs 300 --emb_dim 64 --batch_size 2700 --n_jobs 50 --verbose >> out.log
+echo ************************* 0.1
+python CoDi.py --st_path /goofys/Samples/sc_reference/single_nucleus_cell_atlas/GTEX-1HSMQ-5005_0.1.h5ad --sc_path /goofys/Samples/sc_reference/single_nucleus_cell_atlas/GTEX-1HSMQ-5005.h5ad -a "Cell types level 2"  --epochs 300 --emb_dim 64 --batch_size 2700 --n_jobs 50 --verbose >> out.log
+echo ************************* 0.2
+python CoDi.py --st_path /goofys/Samples/sc_reference/single_nucleus_cell_atlas/GTEX-1HSMQ-5005_0.2.h5ad --sc_path /goofys/Samples/sc_reference/single_nucleus_cell_atlas/GTEX-1HSMQ-5005.h5ad -a "Cell types level 2"  --epochs 300 --emb_dim 64 --batch_size 2700 --n_jobs 50 --verbose >> out.log
+echo ************************* 0.3
+python CoDi.py --st_path /goofys/Samples/sc_reference/single_nucleus_cell_atlas/GTEX-1HSMQ-5005_0.3.h5ad --sc_path /goofys/Samples/sc_reference/single_nucleus_cell_atlas/GTEX-1HSMQ-5005.h5ad -a "Cell types level 2"  --epochs 300 --emb_dim 64 --batch_size 2700 --n_jobs 50 --verbose >> out.log
+echo ************************* 0.4
+python CoDi.py --st_path /goofys/Samples/sc_reference/single_nucleus_cell_atlas/GTEX-1HSMQ-5005_0.4.h5ad --sc_path /goofys/Samples/sc_reference/single_nucleus_cell_atlas/GTEX-1HSMQ-5005.h5ad -a "Cell types level 2"  --epochs 300 --emb_dim 64 --batch_size 2700 --n_jobs 50 --verbose >> out.log
+echo ************************* 0.5
+python CoDi.py --st_path /goofys/Samples/sc_reference/single_nucleus_cell_atlas/GTEX-1HSMQ-5005_0.5.h5ad --sc_path /goofys/Samples/sc_reference/single_nucleus_cell_atlas/GTEX-1HSMQ-5005.h5ad -a "Cell types level 2"  --epochs 300 --emb_dim 64 --batch_size 2700 --n_jobs 50 --verbose >> out.log
+echo ************************* 0.6
+python CoDi.py --st_path /goofys/Samples/sc_reference/single_nucleus_cell_atlas/GTEX-1HSMQ-5005_0.6.h5ad --sc_path /goofys/Samples/sc_reference/single_nucleus_cell_atlas/GTEX-1HSMQ-5005.h5ad -a "Cell types level 2"  --epochs 300 --emb_dim 64 --batch_size 2700 --n_jobs 50 --verbose >> out.log
+echo ************************* 0.7
+python CoDi.py --st_path /goofys/Samples/sc_reference/single_nucleus_cell_atlas/GTEX-1HSMQ-5005_0.7.h5ad --sc_path /goofys/Samples/sc_reference/single_nucleus_cell_atlas/GTEX-1HSMQ-5005.h5ad -a "Cell types level 2"  --epochs 300 --emb_dim 64 --batch_size 2700 --n_jobs 50 --verbose >> out.log
+echo ************************* 0.8
+python CoDi.py --st_path /goofys/Samples/sc_reference/single_nucleus_cell_atlas/GTEX-1HSMQ-5005_0.8.h5ad --sc_path /goofys/Samples/sc_reference/single_nucleus_cell_atlas/GTEX-1HSMQ-5005.h5ad -a "Cell types level 2"  --epochs 300 --emb_dim 64 --batch_size 2700 --n_jobs 50 --verbose >> out.log
+echo ************************* 0.9
+python CoDi.py --st_path /goofys/Samples/sc_reference/single_nucleus_cell_atlas/GTEX-1HSMQ-5005_0.9.h5ad --sc_path /goofys/Samples/sc_reference/single_nucleus_cell_atlas/GTEX-1HSMQ-5005.h5ad -a "Cell types level 2"  --epochs 300 --emb_dim 64 --batch_size 2700 --n_jobs 50 --verbose >> out.log
+

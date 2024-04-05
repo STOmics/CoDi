@@ -16,7 +16,7 @@ conda activate cell2loc_env
 # python scripts/cell2location_script.py --st_path /goofys/Samples/Stereo_seq/E16.5_E1S3_cell_bin_whole_brain_noborderct_unlog1p_pruned_inplace.h5ad --sc_path /goofys/Samples/sc_reference/mouse_brain_L5_csr.h5ad  -a cell_subclass --annotation_st "sim anno" --batch_size 15000 --max_epochs 300 --num_samples 1000
 
 # Mouse brain visium 40K cells
-python scripts/cell2location_script.py --st_path /goofys/Samples/10X/mouse_brain_visium_cell2location_pruned_inplace.h5ad --sc_path /goofys/projects/SSI/datasets/mouse_brain_visium_cell2location/visium_mouse_brain_cell2location_sc_unlog1p_pruned_inplace.h5ad -a annotation_1 --batch_size 15000 --max_epochs 300 --num_samples 1000
+# python scripts/cell2location_script.py --st_path /goofys/Samples/10X/mouse_brain_visium_cell2location_pruned_inplace.h5ad --sc_path /goofys/projects/SSI/datasets/mouse_brain_visium_cell2location/visium_mouse_brain_cell2location_sc_unlog1p_pruned_inplace.h5ad -a annotation_1 --batch_size 15000 --max_epochs 300 --num_samples 1000
 
 # # Mouse kidney 43636x31053
 # python scripts/cell2location_script.py --st_path /goofys/Samples/slide_seq/cellxgene_kidney_slide_seq_v2/Puck_191223_19_corr_pruned_inplace.h5ad --sc_path /goofys/Samples/sc_reference/mouse_kidney/GSE157079_P0_adult.h5ad -a clusters --annotation_st author_cell_type --batch_size 15000 --max_epochs 300 --num_samples 1000
@@ -34,6 +34,8 @@ python scripts/cell2location_script.py --st_path /goofys/Samples/10X/mouse_brain
 # python scripts/cell2location_script.py --st_path /goofys/projects/SSI/datasets/mouse_brain_visium_cell2location/synthetic_sc_0.2.h5ad --sc_path /goofys/projects/SSI/datasets/mouse_brain_visium_cell2location/synthetic_sc.h5ad -a annotation_1 --annotation_st annotation_1 --batch_size 9000 --max_epochs 300 --num_samples 1000
 
 # python scripts/cell2location_script.py --st_path /goofys/projects/SSI/datasets/mouse_brain_visium_cell2location/synthetic_sc_0.3.h5ad --sc_path /goofys/projects/SSI/datasets/mouse_brain_visium_cell2location/synthetic_sc.h5ad -a annotation_1 --annotation_st annotation_1 --batch_size 9000 --max_epochs 300 --num_samples 1000
+
+python scripts/cell2location_script.py --st_path /goofys/projects/SSI/datasets/mouse_brain_visium_cell2location/synthetic_sc_0.4.h5ad --sc_path /goofys/projects/SSI/datasets/mouse_brain_visium_cell2location/synthetic_sc.h5ad -a annotation_1 --annotation_st annotation_1 --batch_size 9000 --max_epochs 300 --num_samples 1000
 
 # python scripts/cell2location_script.py --st_path /goofys/projects/SSI/datasets/mouse_brain_visium_cell2location/synthetic_sc_0.5.h5ad --sc_path /goofys/projects/SSI/datasets/mouse_brain_visium_cell2location/synthetic_sc.h5ad -a annotation_1 --annotation_st annotation_1 --batch_size 9000 --max_epochs 300 --num_samples 1000
 
@@ -63,6 +65,7 @@ python scripts/cell2location_script.py --st_path /goofys/Samples/10X/mouse_brain
 # python scripts/cell2location_script.py --st_path /goofys/Samples/sc_reference/mouse_kidney/GSE157079_P0_adult_0.2.h5ad --sc_path /goofys/Samples/sc_reference/mouse_kidney/GSE157079_P0_adult.h5ad -a clusters --annotation_st clusters --batch_size 9000 --max_epochs 300 --num_samples 1000
 
 # python scripts/cell2location_script.py --st_path /goofys/Samples/sc_reference/mouse_kidney/GSE157079_P0_adult_0.3.h5ad --sc_path /goofys/Samples/sc_reference/mouse_kidney/GSE157079_P0_adult.h5ad -a clusters --annotation_st clusters --batch_size 9000 --max_epochs 300 --num_samples 1000
+# python scripts/cell2location_script.py --st_path /goofys/Samples/sc_reference/mouse_kidney/GSE157079_P0_adult_0.4.h5ad --sc_path /goofys/Samples/sc_reference/mouse_kidney/GSE157079_P0_adult.h5ad -a clusters --annotation_st clusters --batch_size 9000 --max_epochs 300 --num_samples 1000
 
 # python scripts/cell2location_script.py --st_path /goofys/Samples/sc_reference/mouse_kidney/GSE157079_P0_adult_0.5.h5ad --sc_path /goofys/Samples/sc_reference/mouse_kidney/GSE157079_P0_adult.h5ad -a clusters --annotation_st clusters --batch_size 9000 --max_epochs 300 --num_samples 1000
 
@@ -73,3 +76,29 @@ python scripts/cell2location_script.py --st_path /goofys/Samples/10X/mouse_brain
 # python scripts/cell2location_script.py --st_path /goofys/Samples/sc_reference/mouse_kidney/GSE157079_P0_adult_0.8.h5ad --sc_path /goofys/Samples/sc_reference/mouse_kidney/GSE157079_P0_adult.h5ad -a clusters --annotation_st clusters --batch_size 9000 --max_epochs 300 --num_samples 1000
 
 # python scripts/cell2location_script.py --st_path /goofys/Samples/sc_reference/mouse_kidney/GSE157079_P0_adult_0.9.h5ad --sc_path /goofys/Samples/sc_reference/mouse_kidney/GSE157079_P0_adult.h5ad -a clusters --annotation_st clusters --batch_size 9000 --max_epochs 300 --num_samples 1000
+
+##------------------------------------------------##
+# snRNA atlas subsampled
+##------------------------------------------------##
+# python scripts/cell2location_script.py --st_path /goofys/Samples/sc_reference/single_nucleus_cell_atlas/GTEX-1HSMQ-5005.h5ad --sc_path /goofys/Samples/sc_reference/single_nucleus_cell_atlas/GTEX-1HSMQ-5005.h5ad -a "Cell types level 2" --annotation_st "Cell types level 2"  --batch_size 9000 --max_epochs 300 --num_samples 1000
+# echo ************************* 0.05
+# python scripts/cell2location_script.py --st_path /goofys/Samples/sc_reference/single_nucleus_cell_atlas/GTEX-1HSMQ-5005_0.05.h5ad --sc_path /goofys/Samples/sc_reference/single_nucleus_cell_atlas/GTEX-1HSMQ-5005.h5ad -a "Cell types level 2" --annotation_st "Cell types level 2"  --batch_size 9000 --max_epochs 300 --num_samples 1000
+# echo ************************* 0.1
+# python scripts/cell2location_script.py --st_path /goofys/Samples/sc_reference/single_nucleus_cell_atlas/GTEX-1HSMQ-5005_0.1.h5ad --sc_path /goofys/Samples/sc_reference/single_nucleus_cell_atlas/GTEX-1HSMQ-5005.h5ad -a "Cell types level 2" --annotation_st "Cell types level 2"  --batch_size 9000 --max_epochs 300 --num_samples 1000
+# echo ************************* 0.2
+# python scripts/cell2location_script.py --st_path /goofys/Samples/sc_reference/single_nucleus_cell_atlas/GTEX-1HSMQ-5005_0.2.h5ad --sc_path /goofys/Samples/sc_reference/single_nucleus_cell_atlas/GTEX-1HSMQ-5005.h5ad -a "Cell types level 2" --annotation_st "Cell types level 2"  --batch_size 9000 --max_epochs 300 --num_samples 1000
+# echo ************************* 0.3
+# python scripts/cell2location_script.py --st_path /goofys/Samples/sc_reference/single_nucleus_cell_atlas/GTEX-1HSMQ-5005_0.3.h5ad --sc_path /goofys/Samples/sc_reference/single_nucleus_cell_atlas/GTEX-1HSMQ-5005.h5ad -a "Cell types level 2" --annotation_st "Cell types level 2"  --batch_size 9000 --max_epochs 300 --num_samples 1000
+# echo ************************* 0.4
+# python scripts/cell2location_script.py --st_path /goofys/Samples/sc_reference/single_nucleus_cell_atlas/GTEX-1HSMQ-5005_0.4.h5ad --sc_path /goofys/Samples/sc_reference/single_nucleus_cell_atlas/GTEX-1HSMQ-5005.h5ad -a "Cell types level 2" --annotation_st "Cell types level 2"  --batch_size 9000 --max_epochs 300 --num_samples 1000
+# echo ************************* 0.5
+# python scripts/cell2location_script.py --st_path /goofys/Samples/sc_reference/single_nucleus_cell_atlas/GTEX-1HSMQ-5005_0.5.h5ad --sc_path /goofys/Samples/sc_reference/single_nucleus_cell_atlas/GTEX-1HSMQ-5005.h5ad -a "Cell types level 2" --annotation_st "Cell types level 2"  --batch_size 9000 --max_epochs 300 --num_samples 1000
+# echo ************************* 0.6
+# python scripts/cell2location_script.py --st_path /goofys/Samples/sc_reference/single_nucleus_cell_atlas/GTEX-1HSMQ-5005_0.6.h5ad --sc_path /goofys/Samples/sc_reference/single_nucleus_cell_atlas/GTEX-1HSMQ-5005.h5ad -a "Cell types level 2" --annotation_st "Cell types level 2"  --batch_size 9000 --max_epochs 300 --num_samples 1000
+# echo ************************* 0.7
+# python scripts/cell2location_script.py --st_path /goofys/Samples/sc_reference/single_nucleus_cell_atlas/GTEX-1HSMQ-5005_0.7.h5ad --sc_path /goofys/Samples/sc_reference/single_nucleus_cell_atlas/GTEX-1HSMQ-5005.h5ad -a "Cell types level 2" --annotation_st "Cell types level 2"  --batch_size 9000 --max_epochs 300 --num_samples 1000
+# echo ************************* 0.8
+# python scripts/cell2location_script.py --st_path /goofys/Samples/sc_reference/single_nucleus_cell_atlas/GTEX-1HSMQ-5005_0.8.h5ad --sc_path /goofys/Samples/sc_reference/single_nucleus_cell_atlas/GTEX-1HSMQ-5005.h5ad -a "Cell types level 2" --annotation_st "Cell types level 2"  --batch_size 9000 --max_epochs 300 --num_samples 1000
+# echo ************************* 0.9
+# python scripts/cell2location_script.py --st_path /goofys/Samples/sc_reference/single_nucleus_cell_atlas/GTEX-1HSMQ-5005_0.9.h5ad --sc_path /goofys/Samples/sc_reference/single_nucleus_cell_atlas/GTEX-1HSMQ-5005.h5ad -a "Cell types level 2" --annotation_st "Cell types level 2"  --batch_size 9000 --max_epochs 300 --num_samples 1000
+# 
