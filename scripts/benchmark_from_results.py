@@ -30,7 +30,7 @@ hq_path = config["hq_path"]
 lq_paths = config["lq_paths"]
 annotation = config["annotation"]
 algo_suffix_all = config["output_suffix"].split(',')
-distance_metric = config["distance_metric"]
+distance_metrics = config["distance_metric"].split(',')
 
 start = time.time()
 # Read HQ data
@@ -59,7 +59,7 @@ def calc_metric(actual_labels, pred, ind):
     )
     return results_df
 
-for results_dir, algo_suffix in zip(results_dir_all, algo_suffix_all):
+for results_dir, algo_suffix, distance_metric in zip(results_dir_all, algo_suffix_all, distance_metrics):
     print('*'*30, algo_suffix) 
     out_df = pd.DataFrame()
     for lq_path in lq_paths:
@@ -72,7 +72,7 @@ for results_dir, algo_suffix in zip(results_dir_all, algo_suffix_all):
                 )
             )
             subsample_factor_pos = -3
-            out_file_name = f"{sys.argv[1].split('.')[0]}_benchmark_{algo_suffix}_{distance_metric}.csv"
+            out_file_name = f"{os.path.basename(sys.argv[1]).split('.')[0]}_benchmark_{algo_suffix}_{distance_metric}.csv"
         else:
             lq_path_pred = os.path.join(
                 results_dir, os.path.basename(lq_path).replace(
@@ -80,7 +80,7 @@ for results_dir, algo_suffix in zip(results_dir_all, algo_suffix_all):
                 )
             )
             subsample_factor_pos = -2
-            out_file_name = f"{sys.argv[1].split('.')[0]}_benchmark_{algo_suffix}.csv"
+            out_file_name = f"{os.path.basename(sys.argv[1]).split('.')[0]}_benchmark_{algo_suffix}.csv"
         if not os.path.exists(lq_path_pred):
             # raise ValueError(f"no file {lq_path_pred}")
             print(f"no file {lq_path_pred}")
@@ -94,8 +94,9 @@ for results_dir, algo_suffix in zip(results_dir_all, algo_suffix_all):
             if is_number(lq_path_pred.split("_")[subsample_factor_pos])
             else 0.0
         )
+        algo_annotation = 'ssi' if (algo_suffix == 'CoDi' and 'ssi' in adata_st.obs.columns) else algo_suffix
         res_df = calc_metric(
-            adata_sc.obs[annotation], adata_st.obs[f'{algo_suffix}'], subsample_factor
+            adata_sc.obs[annotation], adata_st.obs[f'{algo_annotation}'], subsample_factor
         )
         out_df = pd.concat([out_df, res_df])
         print(out_df)
