@@ -6,9 +6,10 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 
 dataset_prefix = "config_40k_visium"
-dataset_prefix = "config_breast"
+dataset_prefix = "config_breast_distances"
+dataset_prefix = "config_40k_visium_distances"
 dataset_name = dataset_prefix.rsplit('config_')[1]
-compare_CoDi_metrics = False
+compare_CoDi_metrics = True
 output_suffix = ''
 
 cur_path = os.path.dirname(os.path.realpath(__file__))
@@ -19,7 +20,7 @@ else:
     files = glob.glob(os.path.join(cur_path, '../test/') + f'{dataset_prefix}_benchmark_*.csv')
     output_path = f'comparison_{dataset_name}{output_suffix}'
 dfs = {}
-for f in files:
+for f in sorted(files):
     print(f)
     if not compare_CoDi_metrics:
         if ('CoDi_' in f) and (not 'KLD' in f):
@@ -34,7 +35,8 @@ for f in files:
     print(len(dfs[name]), name)
     sns.scatterplot(data=dfs[name], x='Subsample', y='Accuracy')
 plt.legend(labels=dfs.keys())
-plt.xticks(dfs['cell2location']['Subsample'].values, size=7)
+plt.xticks(dfs[list(dfs.keys())[0]]['Subsample'].values, size=7)
 plt.title(f'Cell type detection accuracy for {dataset_name}')
 plt.box(False)
-plt.savefig(output_path + '.png', dpi=150)
+plt.ylim([0.6, 1.05])
+plt.savefig(output_path + '.png', dpi=300)

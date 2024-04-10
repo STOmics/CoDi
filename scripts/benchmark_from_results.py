@@ -60,15 +60,16 @@ def calc_metric(actual_labels, pred, ind):
     return results_df
 
 for results_dir, algo_suffix, distance_metric in zip(results_dir_all, algo_suffix_all, distance_metrics):
-    print('*'*30, algo_suffix) 
+    print('*'*30, algo_suffix, distance_metric) 
     out_df = pd.DataFrame()
     for lq_path in lq_paths:
         print(f"Processing {lq_path}")
     
         if algo_suffix == "CoDi":
+            path_dist_name = distance_metric if distance_metric != 'CoDi_contrastive' else 'KLD'
             lq_path_pred = os.path.join(
                 results_dir, os.path.basename(lq_path).replace(
-                    ".h5ad", f"_{algo_suffix}_{distance_metric}.h5ad"
+                    ".h5ad", f"_{algo_suffix}_{path_dist_name}.h5ad"
                 )
             )
             subsample_factor_pos = -3
@@ -94,7 +95,7 @@ for results_dir, algo_suffix, distance_metric in zip(results_dir_all, algo_suffi
             if is_number(lq_path_pred.split("_")[subsample_factor_pos])
             else 0.0
         )
-        algo_annotation = 'ssi' if (algo_suffix == 'CoDi' and 'ssi' in adata_st.obs.columns) else algo_suffix
+        algo_annotation = 'ssi' if (algo_suffix == 'CoDi' and 'ssi' in adata_st.obs.columns) else ('CoDi_contrastive' if distance_metric == 'CoDi_contrastive' else algo_suffix)
         res_df = calc_metric(
             adata_sc.obs[annotation], adata_st.obs[f'{algo_annotation}'], subsample_factor
         )

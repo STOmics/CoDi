@@ -13,9 +13,9 @@
             "/goofys/Samples/sc_reference/single_nucleus_cell_atlas/GTEX-1HSMQ-5005_0.9.h5ad"
     ],
     "hq_path": "/goofys/Samples/sc_reference/single_nucleus_cell_atlas/GTEX-1HSMQ-5005.h5ad",
-    "results_dir": "/goofys/projects/SSI/testing/synthetic/breast/sn_atlas/tangram,/goofys/projects/SSI/testing/synthetic/breast/sn_atlas/cell2location,/goofys/projects/SSI/testing/synthetic/breast/sn_atlas/CoDi",
+    "results_dir": "/goofys/projects/SSI/testing/synthetic/breast/sn_atlas/KLD,/goofys/projects/SSI/testing/synthetic/breast/sn_atlas/binary,/goofys/projects/SSI/testing/synthetic/breast/sn_atlas/hellinger,/goofys/projects/SSI/testing/synthetic/breast/sn_atlas/relativeEntropy,/goofys/projects/SSI/testing/synthetic/breast/sn_atlas/wasserstein,/goofys/projects/SSI/testing/synthetic/breast/sn_atlas/CoDi,/goofys/projects/SSI/testing/synthetic/breast/sn_atlas/CoDi",
 
     "annotation": "Cell types level 2",
-    "output_suffix": "tangram,cell2location,CoDi",
-    "distance_metric": "KLD,KLD,KLD"
+    "output_suffix": "CoDi,CoDi,CoDi,CoDi,CoDi,CoDi,CoDi",
+    "distance_metric": "KLD,binary,hellinger,relativeEntropy,wasserstein,CoDi_contrastive,CoDi"
 }
