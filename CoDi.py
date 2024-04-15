@@ -6,6 +6,10 @@ import time
 import os
 import warnings
 import subprocess
+import multiprocessing as mp
+import argparse as ap
+from collections import Counter
+from itertools import repeat
 
 import matplotlib.pyplot as plt
 from matplotlib.axes import Axes
@@ -14,19 +18,11 @@ import numpy as np
 import pandas as pd
 import scanpy as sc
 import seaborn as sns
-import multiprocessing as mp
-import argparse as ap
-
-# from tqdm import tqdm
-
 from scipy.spatial.distance import mahalanobis
 from scipy.stats import entropy
 from scipy.special import rel_entr, kl_div
 from scipy.stats import wasserstein_distance
 from scipy.sparse import issparse
-from collections import Counter
-from itertools import repeat
-
 
 random.seed(3)
 
@@ -190,7 +186,7 @@ def main(args):
                 .obsm["spatial_stereoseq"]'
         )
 
-    # Calculate marker genes
+    # Calculate marker genes  TODO: Add to separate function in preprocessing.py
     start_marker = time.time()
     adata_sc.layers["counts"] = adata_sc.X.copy()
     if "rank_genes_groups" not in adata_sc.uns:
@@ -248,7 +244,7 @@ def main(args):
             predictions = queue.get()
             adata_st.obs["pred_contrastive"] = predictions
             contrastive_proc.join()
-            # Write CSV and H5AD
+            # Write CSV and H5AD  TODO: Add to separate function in core/util.py
             adata_st.obs.index.name = "cell_id"
             adata_st.obs["pred_contrastive"].to_csv(
                 os.path.basename(args.st_path).replace(
@@ -265,23 +261,7 @@ def main(args):
         logger.info(f"Total execution time: {(end - start):.2f}s")
         return
 
-    # Filter cells and genes
-    # sc.pp.filter_cells(adata_sc, min_genes=100)
-    # sc.pp.filter_genes(adata_sc, min_cells=5)
-    # sc.pp.filter_cells(adata_st, min_genes=100)
-    # sc.pp.filter_genes(adata_st, min_cells=5)
-
-    # Read datasets and check if matrix is sparse
-    # sc_df_raw = pd.DataFrame(
-    #     adata_sc.X.toarray() if issparse(adata_sc.X) else adata_sc.X,
-    #     index=adata_sc.obs.index, columns=adata_sc.var.index
-    # ).copy()
-    # st_df_raw = pd.DataFrame(
-    #     adata_st.X.toarray() if issparse(adata_st.X) else adata_st.X,
-    #     index=adata_st.obs.index, columns=adata_st.var.index
-    # ).copy()
-
-    # Extract gene expressions only from marker genes
+    # Extract gene expressions only from marker genes  TODO: add to separate function in core/preprocessing.py
     select_ind = [
         np.where(adata_sc.var.index == gene)[0][0] for gene in markers_intersect
     ]
@@ -305,7 +285,7 @@ def main(args):
         index=adata_st.obs.index, columns=cell_types
     ).astype("float32")
 
-    # Algo
+    # Distance based algorithm TODO: Add to separate function in core/distance.py
     # *****************************************
     # Precalculate necessary subset matrices
     # *****************************************
@@ -375,7 +355,7 @@ def main(args):
         ]
         contrastive_proc.join()
 
-    # combine contrastive and distance results
+    # combine contrastive and distance results TODO: Add to separate function in core/util.py
     if args.contrastive:
         assert (
             "probabilities_contrastive" in adata_st.obsm
@@ -397,7 +377,8 @@ def main(args):
     end = time.time()
     logger.info(f"CoDi execution took: {end - start}s")
 
-    # Write CSV and H5AD
+    # Write CSV and H5AD 
+    # TODO: Add to separate function in core/util.py that will work with or without contrastive or distance
     adata_st.obs.index.name = "cell_id"
     # Write CSV and H5AD of final combined results
     if args.contrastive:
@@ -425,7 +406,7 @@ def main(args):
         os.path.basename(args.st_path).replace(".h5ad", f"_CoDi_{args.distance}.h5ad")
     )
 
-    if "spatial" in adata_st.obsm_keys():
+    if "spatial" in adata_st.obsm_keys():  # TODO: Add to separate function in core/util.py
         fig, axs = plt.subplots(1, 2, figsize=(14, 14))
         plot_spatial(
             adata_st, annotation=f"CoDi", spot_size=50, ax=axs[0], title="Cell types"
@@ -453,7 +434,8 @@ if __name__ == "__main__":
     if not os.path.exists("logs"):
         os.makedirs("logs")
 
-    parser = ap.ArgumentParser(description="A script that performs CoDi.")
+    parser = ap.ArgumentParser(
+        description="A script that performs CoDi - Contrastive-Distance reference based cell type annotation.")
     parser.add_argument(
         "--sc_path", help="A single cell reference dataset", type=str, required=True
     )
@@ -465,7 +447,7 @@ if __name__ == "__main__":
         "--annotation",
         help="Annotation label for cell types",
         type=str,
-        required=False,
+        required=True,
         default="cell_subclass",
     )
     parser.add_argument(
@@ -494,56 +476,58 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "--dist_prob_weight",
-        help="Weight coefficient for probabilities obtained by distance metric. Weight for contrastive is 1.0 - dist_prob_weight.",
+        help="Weight coefficient for probabilities obtained by distance metric. \
+            Weight for contrastive is 1.0 - dist_prob_weight. Default is 0.5.",
         type=float,
         required=False,
         default=0.5,
     )
     parser.add_argument(
         "--batch_size",
-        help="Contrastive: Number of samples in the batch. Defaults to 512",
+        help="Contrastive: Number of samples in the batch. Defaults to 512.",
         type=int,
         required=False,
         default=512,
     )
     parser.add_argument(
         "--epochs",
-        help="Contrastive: Number of epochs to train deep encoder. Defaults to 50",
+        help="Contrastive: Number of epochs to train deep encoder. Default is 50.",
         type=int,
         required=False,
         default=50,
     )
     parser.add_argument(
         "--emb_dim",
-        help="Contrastive: Dimension of the output embeddings. Defaults to 32.",
+        help="Contrastive: Dimension of the output embeddings. Default is 32.",
         type=int,
         required=False,
         default=32,
     )
     parser.add_argument(
         "--enc_depth",
-        help="Contrastive: Number of layers in the encoder MLP. Defaults to 4.",
+        help="Contrastive: Number of layers in the encoder MLP. Default is 4.",
         type=int,
         required=False,
         default=4,
     )
     parser.add_argument(
         "--class_depth",
-        help="Contrastive: Number of layers in the classifier MLP. Defaults to 2.",
+        help="Contrastive: Number of layers in the classifier MLP. Default is 2.",
         type=int,
         required=False,
         default=2,
     )
     parser.add_argument(
         "--augmentation_perc",
-        help="Contrastive: Percentage for the augmentation of SC data. If not provided it will be calculated automatically. Defaults to None.",
+        help="Contrastive: Percentage for the augmentation of scRNA reference data. \
+            If not provided it will be calculated automatically. Defaults to None.",
         type=float,
         required=False,
         default=None,
     )
     parser.add_argument(
         "--n_jobs",
-        help="Number of jobs to run in parallel. -1 means using all available processors",
+        help="Number of jobs to run in parallel. -1 means using all available processors.",
         type=int,
         required=False,
         default=-1,
@@ -586,7 +570,7 @@ if __name__ == "__main__":
             mem_logger_fname,
         ]
     )
-    print("Started logging compute utilisation")
+    print("Started logging compute resource utilisation")
 
     main(args=args)
 
