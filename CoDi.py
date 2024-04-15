@@ -10,6 +10,7 @@ import multiprocessing as mp
 import argparse as ap
 from collections import Counter
 from itertools import repeat
+import warnings
 
 import matplotlib.pyplot as plt
 from matplotlib.axes import Axes
@@ -26,6 +27,10 @@ from scipy.stats import wasserstein_distance
 from scipy.sparse import issparse
 
 random.seed(3)
+# Suppress the warning
+warnings.filterwarnings("ignore", message=".*Some cells have zero counts.*")
+warnings.filterwarnings("ignore", message=".*invalid value encountered in log1p*.")
+
 
 
 def create_subsets(gene_set, num_of_subsets=10):
@@ -193,7 +198,6 @@ def main(args):
     if "rank_genes_groups" not in adata_sc.uns:
         sc.pp.normalize_total(adata_sc, target_sum=1e4)
         sc.pp.log1p(adata_sc)
-        sc.pp.highly_variable_genes(adata_sc, inplace=True, n_top_genes=200)
         sc.tl.rank_genes_groups(adata_sc, groupby=args.annotation, use_raw=False)
     else:
         logger.info(f"***d Using precalculated marker genes in input h5ad.")
@@ -535,6 +539,8 @@ if __name__ == "__main__":
         default=-1,
     )
     parser.add_argument("-c", "--contrastive", action="store_true")
+    parser.add_argument("-l", "--log_mem", action="store_true", default=False)
+
     parser.add_argument(
         "-v",
         "--verbose",
@@ -559,33 +565,33 @@ if __name__ == "__main__":
         filename = f"logs/{filename}_{timestamp}.log"
         file_handler = logging.FileHandler(filename)
         logger.addHandler(file_handler)
-    mem_logger_fname = os.path.basename(args.st_path).replace(
-        ".h5ad", "_cpu_gpu_memlog.csv"
-    )
-    if os.path.isfile(mem_logger_fname):
-        os.remove(mem_logger_fname)
+    if args.log_mem:
+        mem_logger_fname = os.path.basename(args.st_path).replace(".h5ad", "_cpu_gpu_memlog.csv")
+        if os.path.isfile(mem_logger_fname):
+            os.remove(mem_logger_fname)
 
-    logger_pid = subprocess.Popen(
-        [
-            "python",
-            "scripts/log_gpu_cpu_stats.py",
-            mem_logger_fname,
-        ]
-    )
-    print("Started logging compute resource utilisation")
+        logger_pid = subprocess.Popen(
+            [
+                "python",
+                "scripts/log_gpu_cpu_stats.py",
+                mem_logger_fname,
+            ]
+        )
+        logger.info("Started logging compute resource utilisation")
 
     main(args=args)
 
-    # End the background process logging the CPU and GPU utilisation.
-    logger_pid.terminate()
-    print("Terminated the compute utilisation logger background process")
+    if args.log_mem:
+        # End the background process logging the CPU and GPU utilisation.
+        logger_pid.terminate()
+        print("Terminated the compute utilisation logger background process")
 
-    # read cpu and gpu memory utilization
-    logger_df = pd.read_csv(mem_logger_fname)
+        # read cpu and gpu memory utilization
+        logger_df = pd.read_csv(mem_logger_fname)
 
-    max_cpu_mem = logger_df.loc[:, "RAM"].max()
-    max_gpu_mem = logger_df.loc[:, "GPU 0"].max()
+        max_cpu_mem = logger_df.loc[:, "RAM"].max()
+        max_gpu_mem = logger_df.loc[:, "GPU 0"].max()
 
-    logger.info(
-        f"Peak RAM Usage: {max_cpu_mem} MiB\nPeak GPU Usage: {max_gpu_mem} MiB\n"
-    )
+        logger.info(
+            f"Peak RAM Usage: {max_cpu_mem} MiB\nPeak GPU Usage: {max_gpu_mem} MiB\n"
+        )
