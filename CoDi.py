@@ -18,6 +18,7 @@ import numpy as np
 import pandas as pd
 import scanpy as sc
 import seaborn as sns
+
 from scipy.spatial.distance import mahalanobis
 from scipy.stats import entropy
 from scipy.special import rel_entr, kl_div
@@ -51,7 +52,7 @@ def binary_distance(p, q):
     return np.sum(p.astype(bool) ^ q.astype(bool))
 
 
-def per_cell(ii, subsets, cell_types, st_df, sc_mean, sc_icms):
+def per_cell(ii, subsets, cell_types, st_df, sc_mean, sc_icms, args):
     best_matches_subsets = []
     for subset_id, subset in enumerate(subsets):
         best_match = {"cell_type": "", "dist": 9999999}
@@ -329,6 +330,7 @@ def main(args):
                 repeat(st_df),
                 repeat(sc_mean),
                 repeat(sc_icms),
+                repeat(args)
             ),
             chunksize=30,
         )
