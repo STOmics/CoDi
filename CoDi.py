@@ -404,7 +404,7 @@ def main(args):
             )
         )
     else:
-        adata_st.obs[["CoDi_dist", "confidence_dist", "CoDi", "confidence"]].to_csv(
+        adata_st.obs[["CoDi_dist", "CoDi_confidence_dist", "CoDi", "CoDi_confidence"]].to_csv(
             os.path.basename(args.st_path).replace(
                 ".h5ad", f"_CoDi_{args.distance}.csv"
             )
