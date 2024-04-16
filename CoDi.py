@@ -19,7 +19,6 @@ import numpy as np
 import pandas as pd
 import scanpy as sc
 import seaborn as sns
-
 from scipy.spatial.distance import mahalanobis
 from scipy.stats import entropy
 from scipy.special import rel_entr, kl_div
@@ -30,7 +29,7 @@ random.seed(3)
 # Suppress the warning
 warnings.filterwarnings("ignore", message=".*Some cells have zero counts.*")
 warnings.filterwarnings("ignore", message=".*invalid value encountered in log1p*.")
-
+warnings.filterwarnings("ignore", message=".*is_categorical_dtype is deprecated.*")
 
 
 def create_subsets(gene_set, num_of_subsets=10):
@@ -194,10 +193,11 @@ def main(args):
 
     # Calculate marker genes  TODO: Add to separate function in preprocessing.py
     start_marker = time.time()
-    adata_sc.layers["counts"] = adata_sc.X.copy()
+    adata_sc.layers["counts"] = adata_sc.X.copy()  # Used in contrastive learning
     if "rank_genes_groups" not in adata_sc.uns:
-        sc.pp.normalize_total(adata_sc, target_sum=1e4)
-        sc.pp.log1p(adata_sc)
+        if adata_sc.X.min() >= 0:  # If already logaritmized skip
+            sc.pp.normalize_total(adata_sc, target_sum=1e4)
+            sc.pp.log1p(adata_sc)
         sc.tl.rank_genes_groups(adata_sc, groupby=args.annotation, use_raw=False)
     else:
         logger.info(f"***d Using precalculated marker genes in input h5ad.")
@@ -205,18 +205,19 @@ def main(args):
     markers_df = pd.DataFrame(adata_sc.uns["rank_genes_groups"]["names"]).iloc[
         0 : args.num_markers, :
     ]
+
     markers = list(np.unique(markers_df.melt().value.values))
 
     markers_intersect = list(set(markers).intersection(adata_st.var.index))
     logger.info(
-        f"Using {len(markers_intersect)} single cell marker genes that exist in ST dataset"
+        f"Using {len(markers_intersect)} unique single cell marker genes that exist in ST dataset ({args.num_markers} per cell type)"
     )
     end_marker = time.time()
     marker_time = np.round(end_marker - start_marker, 3)
     logger.info(f"Calculation of marker genes took {marker_time:.2f}")
 
     # Contrastive part
-    if args.contrastive:
+    if not args.no_contrastive:
         import core
 
         queue = mp.Queue()
@@ -243,28 +244,28 @@ def main(args):
         contrastive_proc.start()
 
     if args.distance == "none":
-        if args.contrastive:
+        if not args.no_contrastive:
             df_probabilities = queue.get()  # FIFO (ordering in contrastive.py)
             adata_st.obsm["probabilities_contrastive"] = df_probabilities
             predictions = queue.get()
-            adata_st.obs["pred_contrastive"] = predictions
+            adata_st.obs["CoDi_contrastive"] = predictions
             contrastive_proc.join()
             # Write CSV and H5AD  TODO: Add to separate function in core/util.py
             adata_st.obs.index.name = "cell_id"
-            adata_st.obs["pred_contrastive"].to_csv(
+            adata_st.obs["CoDi_contrastive"].to_csv(
                 os.path.basename(args.st_path).replace(
-                    ".h5ad", f"_contrastive_{args.distance}.csv"
+                    ".h5ad", f"_CoDi_{args.distance}.csv"
                 )
             )
             adata_st.write_h5ad(
                 os.path.basename(args.st_path).replace(
-                    ".h5ad", f"_ssi_{args.distance}.h5ad"
+                    ".h5ad", f"_CoDi_{args.distance}.h5ad"
                 )
             )
         logger.info(f"No distance metric specified, exiting...")
         end = time.time()
         logger.info(f"Total execution time: {(end - start):.2f}s")
-        return
+        return # TODO: Remove this and unite with same code for saving results
 
     # Extract gene expressions only from marker genes  TODO: add to separate function in core/preprocessing.py
     select_ind = [
@@ -350,7 +351,7 @@ def main(args):
     # sns.histplot([x["confidence"] for x in assigned_types])
     # plt.savefig(f"CoDi_confidence_hist__{args.distance}.png", dpi=120, bbox_inches="tight")
 
-    if args.contrastive:
+    if not args.no_contrastive:
         df_probabilities = queue.get()  # FIFO (ordering in contrastive.py)
         adata_st.obsm["probabilities_contrastive"] = df_probabilities
         predictions = queue.get()
@@ -362,7 +363,7 @@ def main(args):
         contrastive_proc.join()
 
     # combine contrastive and distance results TODO: Add to separate function in core/util.py
-    if args.contrastive:
+    if not args.no_contrastive:
         assert (
             "probabilities_contrastive" in adata_st.obsm
         ), "Missing 'probabilities_contrastive' in adata_st.obsm."
@@ -387,7 +388,7 @@ def main(args):
     # TODO: Add to separate function in core/util.py that will work with or without contrastive or distance
     adata_st.obs.index.name = "cell_id"
     # Write CSV and H5AD of final combined results
-    if args.contrastive:
+    if not args.no_contrastive:
         adata_st.obs[
             [
                 "CoDi_dist",
@@ -475,7 +476,7 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "--num_markers",
-        help="Number of marker genes",
+        help="Number of marker genes per cell type.",
         type=int,
         required=False,
         default=100,
@@ -538,7 +539,11 @@ if __name__ == "__main__":
         required=False,
         default=-1,
     )
-    parser.add_argument("-c", "--contrastive", action="store_true")
+    parser.add_argument("--no_contrastive", 
+        action="store_true",
+        default=False,
+        help="Turn off contrastive prediction of cell types."
+    )
     parser.add_argument("-l", "--log_mem", action="store_true", default=False)
 
     parser.add_argument(
