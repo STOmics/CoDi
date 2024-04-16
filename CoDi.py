@@ -343,7 +343,7 @@ def main(args):
     assigned_types.sort(key=lambda x: x[0])
     assigned_types = [at[1] for at in assigned_types]
     adata_st.obs["CoDi_dist"] = [x["cell_type"] for x in assigned_types]
-    adata_st.obs["confidence_dist"] = [x["confidence"] for x in assigned_types]
+    adata_st.obs["CoDi_confidence_dist"] = [x["confidence"] for x in assigned_types]
     adata_st.obsm["probabilities_dist"].iloc[:, :] = [
         x["ct_probabilities"] for x in assigned_types
     ]
@@ -356,7 +356,7 @@ def main(args):
         adata_st.obsm["probabilities_contrastive"] = df_probabilities
         predictions = queue.get()
         adata_st.obs["CoDi_contrastive"] = predictions
-        adata_st.obs["confidence_contrastive"] = [
+        adata_st.obs["CoDi_confidence_contrastive"] = [
             np.round(prow.max(), 3)
             for _, prow in adata_st.obsm["probabilities_contrastive"].iterrows()
         ]
@@ -373,13 +373,13 @@ def main(args):
         adata_st.obs["CoDi"] = np.array(
             [prow.idxmax() for _, prow in adata_st.obsm["probabilities"].iterrows()]
         ).astype("str")
-        adata_st.obs["confidence"] = [
+        adata_st.obs["CoDi_confidence"] = [
             np.round(prow.max(), 3)
             for _, prow in adata_st.obsm["probabilities"].iterrows()
         ]
     else:
         adata_st.obs["CoDi"] = adata_st.obs["CoDi_dist"]
-        adata_st.obs["confidence"] = adata_st.obs["confidence_dist"]
+        adata_st.obs["CoDi_confidence"] = adata_st.obs["CoDi_confidence_dist"]
 
     end = time.time()
     logger.info(f"CoDi execution took: {end - start}s")
@@ -391,12 +391,12 @@ def main(args):
     if not args.no_contrastive:
         adata_st.obs[
             [
-                "CoDi_dist",
-                "confidence_dist",
-                "CoDi_contrastive",
-                "confidence_contrastive",
                 "CoDi",
-                "confidence",
+                "CoDi_confidence",
+                "CoDi_dist",
+                "CoDi_confidence_dist",
+                "CoDi_contrastive",
+                "CoDi_confidence_contrastive"
             ]
         ].to_csv(
             os.path.basename(args.st_path).replace(
@@ -420,7 +420,7 @@ def main(args):
         )
         plot_spatial(
             adata_st,
-            annotation=f"confidence",
+            annotation=f"CoDi_confidence",
             spot_size=50,
             ax=axs[1],
             title="Confidence map",
