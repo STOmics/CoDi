@@ -13,9 +13,9 @@
             "/goofys/Samples/sc_reference/single_nucleus_cell_atlas/GTEX-1HSMQ-5005_0.9.h5ad"
     ],
     "hq_path": "/goofys/Samples/sc_reference/single_nucleus_cell_atlas/GTEX-1HSMQ-5005.h5ad",
-    "results_dir": "/goofys/projects/SSI/testing/synthetic/breast/sn_atlas/tangram,/goofys/projects/SSI/testing/synthetic/breast/sn_atlas/cell2location,/goofys/projects/SSI/testing/synthetic/breast/sn_atlas/CoDi",
+    "results_dir": "/goofys/projects/SSI/testing/synthetic/breast/sn_atlas/CoDi,/goofys/projects/SSI/testing/synthetic/breast/sn_atlas/seurat,/goofys/projects/SSI/testing/synthetic/breast/sn_atlas/cytospace,/goofys/projects/SSI/testing/synthetic/breast/sn_atlas/tangram,/goofys/projects/SSI/testing/synthetic/breast/sn_atlas/cell2location",
 
     "annotation": "Cell types level 2",
-    "output_suffix": "tangram,cell2location,CoDi",
-    "distance_metric": "KLD,KLD,KLD"
+    "output_suffix": "CoDi,seurat,cytospace,tangram,cell2location",
+    "distance_metric": "KLD,KLD,KLD,KLD,KLD"
 }

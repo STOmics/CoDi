@@ -64,12 +64,12 @@ for results_dir, algo_suffix, distance_metric in zip(results_dir_all, algo_suffi
     out_df = pd.DataFrame()
     for lq_path in lq_paths:
         print(f"Processing {lq_path}")
-    
+        lq_type = 'csv'
         if algo_suffix == "CoDi":
             path_dist_name = distance_metric if distance_metric != 'CoDi_contrastive' else 'KLD'
             lq_path_pred = os.path.join(
                 results_dir, os.path.basename(lq_path).replace(
-                    ".h5ad", f"_{algo_suffix}_{path_dist_name}.h5ad"
+                    ".h5ad", f"_{algo_suffix}_{path_dist_name}.{lq_type}"
                 )
             )
             subsample_factor_pos = -3
@@ -77,27 +77,35 @@ for results_dir, algo_suffix, distance_metric in zip(results_dir_all, algo_suffi
         else:
             lq_path_pred = os.path.join(
                 results_dir, os.path.basename(lq_path).replace(
-                    ".h5ad", f"_{algo_suffix}.h5ad"
+                    f".h5ad", f"_{algo_suffix}.{lq_type}"
                 )
             )
             subsample_factor_pos = -2
             out_file_name = f"{os.path.basename(sys.argv[1]).split('.')[0]}_benchmark_{algo_suffix}.csv"
         if not os.path.exists(lq_path_pred):
+            lq_path_pred = lq_path_pred.replace(lq_type, '.h5ad')
             # raise ValueError(f"no file {lq_path_pred}")
-            print(f"no file {lq_path_pred}")
-            continue
+            lq_type = 'h5ad'
+            if not os.path.exists(lq_path_pred):
+                print(f"no file {lq_path_pred}")
+                continue
         print('Reading ' + lq_path_pred)
-        adata_st = sc.read_h5ad(lq_path_pred)
-
-        adata_st.var_names_make_unique()
+        if lq_type == 'h5ad':
+            adata_st = sc.read_h5ad(lq_path_pred)
+            adata_st.var_names_make_unique()
+            test_preds = adata_st.obs[f'{algo_annotation}']
+        else:
+            adata_st = pd.read_csv(lq_path_pred)
+            test_preds = adata_st[adata_st.columns[1]].values
         subsample_factor = (
             lq_path_pred.split("_")[subsample_factor_pos]
             if is_number(lq_path_pred.split("_")[subsample_factor_pos])
             else 0.0
         )
         algo_annotation = 'ssi' if (algo_suffix == 'CoDi' and 'ssi' in adata_st.obs.columns) else ('CoDi_contrastive' if distance_metric == 'CoDi_contrastive' else algo_suffix)
+
         res_df = calc_metric(
-            adata_sc.obs[annotation], adata_st.obs[f'{algo_annotation}'], subsample_factor
+            adata_sc.obs[annotation], test_preds, subsample_factor
         )
         out_df = pd.concat([out_df, res_df])
         print(out_df)
