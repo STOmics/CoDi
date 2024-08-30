@@ -1,6 +1,7 @@
 # Contrastive Distance (CoDi) reference-based cell type annotation
 
-Accurate cell type annotation utilizing neural network based on contrastive learning and advanced distance calculation methods and reference single-cell datasets
+Accurate cell type annotation utilizing neural network based on contrastive learning and advanced distance calculation methods and reference single-cell datasets.
+Check [preprint](https://www.researchsquare.com/article/rs-4495419/v1) of the CoDi manuscript.
 
 ## Table of Contents
 
@@ -37,7 +38,7 @@ docker run --rm \
     --sc_path /data/your_single_cell_dataset.h5ad \
     --st_path /data/your_spatial_dataset.h5ad \
     -a "cell_subclass"
-
+```
 
 ## Parameters
 
