@@ -428,10 +428,10 @@ def main(args):
         plt.savefig(os.path.join(args.out_path,
             os.path.basename(args.st_path).replace(
                 ".h5ad", f"_CoDi_{args.distance}.png"
-            ),
+        )),
             dpi=120,
             bbox_inches="tight",
-        ))
+        )
 
     end = time.time()
     logger.info(f"Total execution time: {(end - start):.2f}s")
