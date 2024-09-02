@@ -573,8 +573,8 @@ if __name__ == "__main__":
     filename = None
     if args.verbose != logging.WARNING:
         timestamp = datetime.datetime.now().strftime("%d_%m_%Y_%H_%M")
-        filename = os.path.join(args.out_path, os.path.basename(args.st_path).replace(".h5ad", ""))
-        filename = f"logs/{filename}_{timestamp}.log"
+        filename = os.path.basename(args.st_path).replace(".h5ad", "")
+        filename = os.path.join(args.out_path, f"logs/{filename}_{timestamp}.log")
         file_handler = logging.FileHandler(filename)
         logger.addHandler(file_handler)
     if args.log_mem:
