@@ -28,8 +28,5 @@ RUN pip3 install --no-cache-dir -r requirements.txt
 COPY Dockerfile /opt/Dockerfile
 
 # Ensure that the entry point is the Python interpreter
-ENTRYPOINT ["/bin/bash"]
-
-# Default command will be to show the help message of CoDi
-# CMD ["python /opt/CoDi/CoDi.py", "--help"]
+ENTRYPOINT ["python3", "/opt/codi/CoDi.py"]
 
