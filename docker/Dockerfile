@@ -14,19 +14,19 @@ RUN apt-get update && apt-get install -y \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
-# Clone the CoDi repository
-RUN git clone https://github.com/stomics/codi.git /opt/codi
-
-# Set working directory
-WORKDIR /opt/codi
 
 # Install Python dependencies
 RUN pip3 install --no-cache-dir --force-reinstall h5py==3.8.0
+
+# Clone the CoDi repository
+RUN git clone --progress https://github.com/stomics/codi.git /opt/CoDi 
+# Set working directory
+WORKDIR /opt/CoDi
 RUN pip3 install --no-cache-dir -r requirements.txt
+
+# Ensure that the entry point is the Python interpreter
+ENTRYPOINT ["python3", "/opt/CoDi/CoDi.py"]
 
 # Copy the Dockerfile to /opt
 COPY Dockerfile /opt/Dockerfile
-
-# Ensure that the entry point is the Python interpreter
-ENTRYPOINT ["python3", "/opt/codi/CoDi.py"]
 
