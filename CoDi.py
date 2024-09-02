@@ -575,6 +575,8 @@ if __name__ == "__main__":
         timestamp = datetime.datetime.now().strftime("%d_%m_%Y_%H_%M")
         filename = os.path.basename(args.st_path).replace(".h5ad", "")
         filename = os.path.join(args.out_path, f"logs/{filename}_{timestamp}.log")
+        if not os.path.exists(os.path.dirname(filename)):
+            os.makedirs(os.path.dirname(filename))
         file_handler = logging.FileHandler(filename)
         logger.addHandler(file_handler)
     if args.log_mem:
