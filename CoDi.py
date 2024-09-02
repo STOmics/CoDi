@@ -252,12 +252,12 @@ def main(args):
             contrastive_proc.join()
             # Write CSV and H5AD  TODO: Add to separate function in core/util.py
             adata_st.obs.index.name = "cell_id"
-            adata_st.obs["CoDi_contrastive"].to_csv(os.path.join(args['out_path'],
+            adata_st.obs["CoDi_contrastive"].to_csv(os.path.join(args.out_path,
                 os.path.basename(args.st_path).replace(
                     ".h5ad", f"_CoDi_{args.distance}.csv"
                 )
             ))
-            adata_st.write_h5ad(os.path.join(args['out_path'],
+            adata_st.write_h5ad(os.path.join(args.out_path,
                 os.path.basename(args.st_path).replace(
                     ".h5ad", f"_CoDi_{args.distance}.h5ad"
                 )
@@ -398,18 +398,18 @@ def main(args):
                 "CoDi_contrastive",
                 "CoDi_confidence_contrastive"
             ]
-        ].to_csv(os.path.join(args['out_path'],
+        ].to_csv(os.path.join(args.out_path,
             os.path.basename(args.st_path).replace(
                 ".h5ad", f"_CoDi_{args.distance}.csv"
             ))
         )
     else:
         adata_st.obs[["CoDi_dist", "CoDi_confidence_dist", "CoDi", "CoDi_confidence"]].to_csv(
-            os.path.join(args['out_path'], os.path.basename(args.st_path).replace(
+            os.path.join(args.out_path, os.path.basename(args.st_path).replace(
                 ".h5ad", f"_CoDi_{args.distance}.csv"
             ))
         )
-    adata_st.write_h5ad(os.path.join(args['out_path'],
+    adata_st.write_h5ad(os.path.join(args.out_path,
         os.path.basename(args.st_path).replace(".h5ad", f"_CoDi_{args.distance}.h5ad")
     ))
 
@@ -425,7 +425,7 @@ def main(args):
             ax=axs[1],
             title="Confidence map",
         )
-        plt.savefig(os.path.join(args['out_path'],
+        plt.savefig(os.path.join(args.out_path,
             os.path.basename(args.st_path).replace(
                 ".h5ad", f"_CoDi_{args.distance}.png"
             ),
@@ -573,12 +573,12 @@ if __name__ == "__main__":
     filename = None
     if args.verbose != logging.WARNING:
         timestamp = datetime.datetime.now().strftime("%d_%m_%Y_%H_%M")
-        filename = os.path.join(args['out_path'], os.path.basename(args.st_path).replace(".h5ad", ""))
+        filename = os.path.join(args.out_path, os.path.basename(args.st_path).replace(".h5ad", ""))
         filename = f"logs/{filename}_{timestamp}.log"
         file_handler = logging.FileHandler(filename)
         logger.addHandler(file_handler)
     if args.log_mem:
-        mem_logger_fname = os.path.join(args['out_path'], os.path.basename(args.st_path).replace(".h5ad", "_cpu_gpu_memlog.csv"))
+        mem_logger_fname = os.path.join(args.out_path, os.path.basename(args.st_path).replace(".h5ad", "_cpu_gpu_memlog.csv"))
         if os.path.isfile(mem_logger_fname):
             os.remove(mem_logger_fname)
 
