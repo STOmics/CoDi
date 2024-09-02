@@ -252,16 +252,16 @@ def main(args):
             contrastive_proc.join()
             # Write CSV and H5AD  TODO: Add to separate function in core/util.py
             adata_st.obs.index.name = "cell_id"
-            adata_st.obs["CoDi_contrastive"].to_csv(
+            adata_st.obs["CoDi_contrastive"].to_csv(os.path.join(args['out_path'],
                 os.path.basename(args.st_path).replace(
                     ".h5ad", f"_CoDi_{args.distance}.csv"
                 )
-            )
-            adata_st.write_h5ad(
+            ))
+            adata_st.write_h5ad(os.path.join(args['out_path'],
                 os.path.basename(args.st_path).replace(
                     ".h5ad", f"_CoDi_{args.distance}.h5ad"
                 )
-            )
+            ))
         logger.info(f"No distance metric specified, exiting...")
         end = time.time()
         logger.info(f"Total execution time: {(end - start):.2f}s")
@@ -398,20 +398,20 @@ def main(args):
                 "CoDi_contrastive",
                 "CoDi_confidence_contrastive"
             ]
-        ].to_csv(
+        ].to_csv(os.path.join(args['out_path'],
             os.path.basename(args.st_path).replace(
                 ".h5ad", f"_CoDi_{args.distance}.csv"
-            )
+            ))
         )
     else:
         adata_st.obs[["CoDi_dist", "CoDi_confidence_dist", "CoDi", "CoDi_confidence"]].to_csv(
-            os.path.basename(args.st_path).replace(
+            os.path.join(args['out_path'], os.path.basename(args.st_path).replace(
                 ".h5ad", f"_CoDi_{args.distance}.csv"
-            )
+            ))
         )
-    adata_st.write_h5ad(
+    adata_st.write_h5ad(os.path.join(args['out_path'],
         os.path.basename(args.st_path).replace(".h5ad", f"_CoDi_{args.distance}.h5ad")
-    )
+    ))
 
     if "spatial" in adata_st.obsm_keys():  # TODO: Add to separate function in core/util.py
         fig, axs = plt.subplots(1, 2, figsize=(14, 14))
@@ -425,13 +425,13 @@ def main(args):
             ax=axs[1],
             title="Confidence map",
         )
-        plt.savefig(
+        plt.savefig(os.path.join(args['out_path'],
             os.path.basename(args.st_path).replace(
                 ".h5ad", f"_CoDi_{args.distance}.png"
             ),
             dpi=120,
             bbox_inches="tight",
-        )
+        ))
 
     end = time.time()
     logger.info(f"Total execution time: {(end - start):.2f}s")
@@ -554,6 +554,13 @@ if __name__ == "__main__":
         const=logging.INFO,
         default=logging.WARNING,
     )
+    parser.add_argument(
+        "--out_path",
+        help="Output path to store results.",
+        type=str,
+        required=False,
+        default='',
+    )
 
     args = parser.parse_args()
 
@@ -566,12 +573,12 @@ if __name__ == "__main__":
     filename = None
     if args.verbose != logging.WARNING:
         timestamp = datetime.datetime.now().strftime("%d_%m_%Y_%H_%M")
-        filename = os.path.basename(args.st_path).replace(".h5ad", "")
+        filename = os.path.join(args['out_path'], os.path.basename(args.st_path).replace(".h5ad", ""))
         filename = f"logs/{filename}_{timestamp}.log"
         file_handler = logging.FileHandler(filename)
         logger.addHandler(file_handler)
     if args.log_mem:
-        mem_logger_fname = os.path.basename(args.st_path).replace(".h5ad", "_cpu_gpu_memlog.csv")
+        mem_logger_fname = os.path.join(args['out_path'], os.path.basename(args.st_path).replace(".h5ad", "_cpu_gpu_memlog.csv"))
         if os.path.isfile(mem_logger_fname):
             os.remove(mem_logger_fname)
 
