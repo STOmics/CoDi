@@ -165,7 +165,7 @@ def plot_spatial(
     sns.despine(bottom=True, left=True, ax=ax)
 
 
-def main(args):
+def main_proc(args, logger, filename):
     start = time.time()
 
     adata_sc = sc.read_h5ad(args.sc_path)
@@ -237,6 +237,7 @@ def main(args):
                 classifier_depth=args.class_depth,
                 filename=filename,
                 augmentation_perc=args.augmentation_perc,
+                logger=logger,
                 queue=queue,
             ),
             name="Contrastive process",
@@ -384,7 +385,7 @@ def main(args):
     end = time.time()
     logger.info(f"CoDi execution took: {end - start}s")
 
-    # Write CSV and H5AD 
+    # Write CSV and H5AD
     # TODO: Add to separate function in core/util.py that will work with or without contrastive or distance
     adata_st.obs.index.name = "cell_id"
     # Write CSV and H5AD of final combined results
@@ -437,7 +438,7 @@ def main(args):
     logger.info(f"Total execution time: {(end - start):.2f}s")
 
 
-if __name__ == "__main__":
+def main(args=None):
     if not os.path.exists("logs"):
         os.makedirs("logs")
 
@@ -593,7 +594,7 @@ if __name__ == "__main__":
         )
         logger.info("Started logging compute resource utilisation")
 
-    main(args=args)
+    main_proc(args=args, logger=logger, filename=filename)
 
     if args.log_mem:
         # End the background process logging the CPU and GPU utilisation.
@@ -609,3 +610,7 @@ if __name__ == "__main__":
         logger.info(
             f"Peak RAM Usage: {max_cpu_mem} MiB\nPeak GPU Usage: {max_gpu_mem} MiB\n"
         )
+
+
+if __name__ == "__main__":
+    main()

@@ -681,12 +681,9 @@ def contrastive_process(
     classifier_depth: int,
     filename: str,
     augmentation_perc: float,
+    logger: logging.Logger,
     queue=None,
 ):
-    if filename:
-        file_handler = logging.FileHandler(filename)
-        logger.addHandler(file_handler)
-
     fix_seed(0)
     adata_sc.X = adata_sc.layers["counts"]
 
