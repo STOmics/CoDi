@@ -19,7 +19,7 @@ RUN apt-get update && apt-get install -y \
 RUN pip3 install --no-cache-dir --force-reinstall h5py==3.8.0
 
 # Clone the CoDi repository
-RUN git clone --progress https://github.com/stomics/codi.git /opt/CoDi 
+RUN git clone --progress --branch main  https://github.com/stomics/codi.git /opt/CoDi 
 # Set working directory
 WORKDIR /opt/CoDi
 RUN pip3 install --no-cache-dir -r requirements.txt
