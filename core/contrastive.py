@@ -29,8 +29,8 @@ from torch.utils.data import DataLoader
 from tqdm.auto import tqdm
 from sklearn.metrics import accuracy_score, f1_score
 
-from core.contrastive_augmentation import augment_data
-from core.preprocessing import preprocess
+from contrastive_augmentation import augment_data
+from preprocessing import preprocess
 
 dirs = ["loss_curves", "models"]
 for d in dirs:

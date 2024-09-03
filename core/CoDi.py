@@ -218,12 +218,12 @@ def main_proc(args, logger, filename):
 
     # Contrastive part
     if not args.no_contrastive:
-        import core
+        from contrastive import contrastive_process
 
         queue = mp.Queue()
 
         contrastive_proc = mp.Process(
-            target=core.contrastive_process,
+            target=contrastive_process,
             kwargs=dict(
                 sc_path=args.sc_path,
                 st_path=args.st_path,

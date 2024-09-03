@@ -6,14 +6,14 @@ with open("requirements.txt", "r") as fh:
 
 setup(
     name="codi_bg",
-    version="0.1.0",
+    version="0.1.2",
     description="CoDi - Contrastive Distance reference-based cell type annotation for spatial transcriptomics.",
     url="https://github.com/stomics/codi",
     author="Vladimir Kovacevic",
     author_email="vladimirkovacevic@genomics.cn",
     license="MIT",
-    package_dir={"": "core"},  # Specifies that packages are under the src directory
-    packages=find_packages(where="src"),  # Finds packages in the src directory
+    package_dir={"": "core"},  # Specifies that packages are under the core directory
+    # packages=find_packages(where="core"),  # Finds packages in the core directory
     install_requires=requirements,
     classifiers=[
         "Programming Language :: Python :: 3",
