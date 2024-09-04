@@ -30,6 +30,7 @@ random.seed(3)
 warnings.filterwarnings("ignore", message=".*Some cells have zero counts.*")
 warnings.filterwarnings("ignore", message=".*invalid value encountered in log1p*.")
 warnings.filterwarnings("ignore", message=".*is_categorical_dtype is deprecated.*")
+warnings.filterwarnings("ignore", message=".*Variable names are not unique.*")
 
 
 def create_subsets(gene_set, num_of_subsets=10):
@@ -198,7 +199,7 @@ def main_proc(args, logger, filename):
         if adata_sc.X.min() >= 0:  # If already logaritmized skip
             sc.pp.normalize_total(adata_sc, target_sum=1e4)
             sc.pp.log1p(adata_sc)
-        sc.tl.rank_genes_groups(adata_sc, groupby=args.annotation, use_raw=False)
+        sc.tl.rank_genes_groups(adata_sc, groupby=args.annotation, use_raw=False, method='t-test')
     else:
         logger.info(f"***d Using precalculated marker genes in input h5ad.")
 
