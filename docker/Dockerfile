@@ -19,13 +19,13 @@ RUN apt-get update && apt-get install -y \
 RUN pip3 install --no-cache-dir --force-reinstall h5py==3.8.0
 
 # Clone the CoDi repository
-RUN git clone --progress --branch main  https://github.com/stomics/codi.git /opt/CoDi 
+RUN git clone https://github.com/stomics/codi.git /opt/CoDi && echo "Cache bust: $(date)" > /dev/null 
 # Set working directory
 WORKDIR /opt/CoDi
 RUN pip3 install --no-cache-dir -r requirements.txt
 
 # Ensure that the entry point is the Python interpreter
-ENTRYPOINT ["python3", "/opt/CoDi/CoDi.py"]
+ENTRYPOINT ["python3", "/opt/CoDi/core/CoDi.py"]
 
 # Copy the Dockerfile to /opt
 COPY Dockerfile /opt/Dockerfile

@@ -6,7 +6,7 @@ with open("requirements.txt", "r") as fh:
 
 setup(
     name="codi_bg",
-    version="0.1.2",
+    version="0.1.3",
     description="CoDi - Contrastive Distance reference-based cell type annotation for spatial transcriptomics.",
     url="https://github.com/stomics/codi",
     author="Vladimir Kovacevic",
