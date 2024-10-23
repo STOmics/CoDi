@@ -196,13 +196,16 @@ def main_proc(args, logger, filename):
     start_marker = time.time()
     adata_sc.layers["counts"] = adata_sc.X.copy()  # Used in contrastive learning
     if "rank_genes_groups" not in adata_sc.uns:
-        if adata_sc.X.min() >= 0:  # If already logaritmized skip
+        if issparse(adata_sc.X):
+            is_integer = np.all(np.mod(adata_sc.X.data, 1) == 0) # Only check non-zero elements for integer values
+        else:
+            is_integer = np.all(np.mod(adata_sc.X, 1) == 0) # If it's not sparse, check the full matrix
+        if is_integer:  # If already normalized skip
             sc.pp.normalize_total(adata_sc, target_sum=1e4)
-            sc.pp.log1p(adata_sc)
+            # sc.pp.log1p(adata_sc)
         sc.tl.rank_genes_groups(adata_sc, groupby=args.annotation, use_raw=False, method='t-test')
     else:
         logger.info(f"***d Using precalculated marker genes in input h5ad.")
-
     markers_df = pd.DataFrame(adata_sc.uns["rank_genes_groups"]["names"]).iloc[
         0 : args.num_markers, :
     ]
@@ -216,6 +219,16 @@ def main_proc(args, logger, filename):
     end_marker = time.time()
     marker_time = np.round(end_marker - start_marker, 3)
     logger.info(f"Calculation of marker genes took {marker_time:.2f}")
+
+    # Check for sparse matrix
+    if issparse(adata_st.X):
+        is_integer = np.all(np.mod(adata_st.X.data, 1) == 0) # Only check non-zero elements for integer values
+    else:
+        is_integer = np.all(np.mod(adata_st.X, 1) == 0) # If it's not sparse, check the full matrix
+
+    if is_integer:  # If already normalized skip
+        sc.pp.normalize_total(adata_st, target_sum=1e4)
+        # sc.pp.log1p(adata_st)
 
     # Contrastive part
     if not args.no_contrastive:
