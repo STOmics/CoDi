@@ -171,6 +171,8 @@ def main_proc(args, logger, filename):
 
     adata_sc = sc.read_h5ad(args.sc_path)
     adata_st = sc.read_h5ad(args.st_path)
+    adata_sc.X = adata_sc.X.astype("float32")
+    adata_st.X = adata_st.X.astype("float32")
     adata_sc.var_names_make_unique()
     adata_st.var_names_make_unique()
     adata_sc.obs_names_make_unique()
@@ -199,7 +201,9 @@ def main_proc(args, logger, filename):
         if adata_sc.X.min() >= 0:  # If already logaritmized skip
             sc.pp.normalize_total(adata_sc, target_sum=1e4)
             sc.pp.log1p(adata_sc)
-        sc.tl.rank_genes_groups(adata_sc, groupby=args.annotation, use_raw=False, method='t-test')
+        sc.tl.rank_genes_groups(
+            adata_sc, groupby=args.annotation, use_raw=False, method="t-test"
+        )
     else:
         logger.info(f"***d Using precalculated marker genes in input h5ad.")
 
@@ -219,7 +223,7 @@ def main_proc(args, logger, filename):
 
     # Contrastive part
     if not args.no_contrastive:
-        from contrastive import contrastive_process
+        from contrastive_v2 import contrastive_process
 
         queue = mp.Queue()
 
@@ -240,6 +244,7 @@ def main_proc(args, logger, filename):
                 augmentation_perc=args.augmentation_perc,
                 logger=logger,
                 queue=queue,
+                wandb_key=args.wandb_key,
             ),
             name="Contrastive process",
         )
@@ -254,20 +259,26 @@ def main_proc(args, logger, filename):
             contrastive_proc.join()
             # Write CSV and H5AD  TODO: Add to separate function in core/util.py
             adata_st.obs.index.name = "cell_id"
-            adata_st.obs["CoDi_contrastive"].to_csv(os.path.join(args.out_path,
-                os.path.basename(args.st_path).replace(
-                    ".h5ad", f"_CoDi_{args.distance}.csv"
+            adata_st.obs["CoDi_contrastive"].to_csv(
+                os.path.join(
+                    args.out_path,
+                    os.path.basename(args.st_path).replace(
+                        ".h5ad", f"_CoDi_{args.distance}.csv"
+                    ),
                 )
-            ))
-            adata_st.write_h5ad(os.path.join(args.out_path,
-                os.path.basename(args.st_path).replace(
-                    ".h5ad", f"_CoDi_{args.distance}.h5ad"
+            )
+            adata_st.write_h5ad(
+                os.path.join(
+                    args.out_path,
+                    os.path.basename(args.st_path).replace(
+                        ".h5ad", f"_CoDi_{args.distance}.h5ad"
+                    ),
                 )
-            ))
+            )
         logger.info(f"No distance metric specified, exiting...")
         end = time.time()
         logger.info(f"Total execution time: {(end - start):.2f}s")
-        return # TODO: Remove this and unite with same code for saving results
+        return  # TODO: Remove this and unite with same code for saving results
 
     # Extract gene expressions only from marker genes  TODO: add to separate function in core/preprocessing.py
     select_ind = [
@@ -337,7 +348,7 @@ def main_proc(args, logger, filename):
                 repeat(st_df),
                 repeat(sc_mean),
                 repeat(sc_icms),
-                repeat(args)
+                repeat(args),
             ),
             chunksize=30,
         )
@@ -398,24 +409,39 @@ def main_proc(args, logger, filename):
                 "CoDi_dist",
                 "CoDi_confidence_dist",
                 "CoDi_contrastive",
-                "CoDi_confidence_contrastive"
+                "CoDi_confidence_contrastive",
             ]
-        ].to_csv(os.path.join(args.out_path,
-            os.path.basename(args.st_path).replace(
-                ".h5ad", f"_CoDi_{args.distance}.csv"
-            ))
+        ].to_csv(
+            os.path.join(
+                args.out_path,
+                os.path.basename(args.st_path).replace(
+                    ".h5ad", f"_CoDi_{args.distance}.csv"
+                ),
+            )
         )
     else:
-        adata_st.obs[["CoDi_dist", "CoDi_confidence_dist", "CoDi", "CoDi_confidence"]].to_csv(
-            os.path.join(args.out_path, os.path.basename(args.st_path).replace(
-                ".h5ad", f"_CoDi_{args.distance}.csv"
-            ))
+        adata_st.obs[
+            ["CoDi_dist", "CoDi_confidence_dist", "CoDi", "CoDi_confidence"]
+        ].to_csv(
+            os.path.join(
+                args.out_path,
+                os.path.basename(args.st_path).replace(
+                    ".h5ad", f"_CoDi_{args.distance}.csv"
+                ),
+            )
         )
-    adata_st.write_h5ad(os.path.join(args.out_path,
-        os.path.basename(args.st_path).replace(".h5ad", f"_CoDi_{args.distance}.h5ad")
-    ))
+    adata_st.write_h5ad(
+        os.path.join(
+            args.out_path,
+            os.path.basename(args.st_path).replace(
+                ".h5ad", f"_CoDi_{args.distance}.h5ad"
+            ),
+        )
+    )
 
-    if "spatial" in adata_st.obsm_keys():  # TODO: Add to separate function in core/util.py
+    if (
+        "spatial" in adata_st.obsm_keys()
+    ):  # TODO: Add to separate function in core/util.py
         fig, axs = plt.subplots(1, 2, figsize=(14, 14))
         plot_spatial(
             adata_st, annotation=f"CoDi", spot_size=50, ax=axs[0], title="Cell types"
@@ -427,10 +453,13 @@ def main_proc(args, logger, filename):
             ax=axs[1],
             title="Confidence map",
         )
-        plt.savefig(os.path.join(args.out_path,
-            os.path.basename(args.st_path).replace(
-                ".h5ad", f"_CoDi_{args.distance}.png"
-        )),
+        plt.savefig(
+            os.path.join(
+                args.out_path,
+                os.path.basename(args.st_path).replace(
+                    ".h5ad", f"_CoDi_{args.distance}.png"
+                ),
+            ),
             dpi=120,
             bbox_inches="tight",
         )
@@ -444,7 +473,8 @@ def main(args=None):
         os.makedirs("logs")
 
     parser = ap.ArgumentParser(
-        description="A script that performs CoDi - Contrastive-Distance reference based cell type annotation.")
+        description="A script that performs CoDi - Contrastive-Distance reference based cell type annotation."
+    )
     parser.add_argument(
         "--sc_path", help="A single cell reference dataset", type=str, required=True
     )
@@ -503,7 +533,7 @@ def main(args=None):
         help="Contrastive: Number of epochs to train deep encoder. Default is 50.",
         type=int,
         required=False,
-        default=50,
+        default=100,
     )
     parser.add_argument(
         "--emb_dim",
@@ -517,7 +547,7 @@ def main(args=None):
         help="Contrastive: Number of layers in the encoder MLP. Default is 4.",
         type=int,
         required=False,
-        default=4,
+        default=5,
     )
     parser.add_argument(
         "--class_depth",
@@ -541,10 +571,11 @@ def main(args=None):
         required=False,
         default=-1,
     )
-    parser.add_argument("--no_contrastive", 
+    parser.add_argument(
+        "--no_contrastive",
         action="store_true",
         default=False,
-        help="Turn off contrastive prediction of cell types."
+        help="Turn off contrastive prediction of cell types.",
     )
     parser.add_argument("-l", "--log_mem", action="store_true", default=False)
 
@@ -561,7 +592,14 @@ def main(args=None):
         help="Output path to store results.",
         type=str,
         required=False,
-        default='',
+        default="",
+    )
+    parser.add_argument(
+        "--wandb_key",
+        help="Output path to store results.",
+        type=str,
+        required=False,
+        default="66bdf7f04d7842bb591556f5263dd9c779ca1ce7",
     )
 
     args = parser.parse_args()
@@ -582,7 +620,10 @@ def main(args=None):
         file_handler = logging.FileHandler(filename)
         logger.addHandler(file_handler)
     if args.log_mem:
-        mem_logger_fname = os.path.join(args.out_path, os.path.basename(args.st_path).replace(".h5ad", "_cpu_gpu_memlog.csv"))
+        mem_logger_fname = os.path.join(
+            args.out_path,
+            os.path.basename(args.st_path).replace(".h5ad", "_cpu_gpu_memlog.csv"),
+        )
         if os.path.isfile(mem_logger_fname):
             os.remove(mem_logger_fname)
 
