@@ -1,0 +1,17 @@
+Retention type,Cell type,Number of cells,Number of SC marker genes,Number of ST marker genes,Number of ST lost genes,Retention percentage
+unique marker genes,Stroma 2,949,247,46,201,18.62
+unique marker genes,PCT,889,288,95,193,32.99
+unique marker genes,Stroma 1,1887,124,23,101,18.55
+unique marker genes,PST,10131,689,415,274,60.23
+unique marker genes,LOH,6988,76,10,66,13.16
+unique marker genes,DCT,2483,294,62,232,21.09
+unique marker genes,Early PT,695,262,40,222,15.27
+unique marker genes,Unnamed,652,279,65,214,23.3
+top 100 marker genes,Stroma 2,949,99,48,51,48.48
+top 100 marker genes,PCT,889,98,83,15,84.69
+top 100 marker genes,Stroma 1,1887,96,60,36,62.5
+top 100 marker genes,PST,10131,96,91,5,94.79
+top 100 marker genes,LOH,6988,95,94,1,98.95
+top 100 marker genes,DCT,2483,95,90,5,94.74
+top 100 marker genes,Early PT,695,99,58,41,58.59
+top 100 marker genes,Unnamed,652,86,8,78,9.3

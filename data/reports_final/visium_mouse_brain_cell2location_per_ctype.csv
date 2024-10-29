@@ -1,0 +1,11 @@
+Retention type,Cell type,Number of cells,Number of SC marker genes,Number of ST marker genes,Number of ST lost genes,Retention percentage
+unique marker genes,LowQ_1,718,469,27,442,5.76
+unique marker genes,Unk_1,1976,1544,2,1542,0.13
+unique marker genes,Endo,10999,1494,0,1494,0.0
+unique marker genes,Oligo_2,940,2170,42,2128,1.94
+unique marker genes,Astro_WM,333,426,55,371,12.91
+top 100 marker genes,LowQ_1,718,89,1,88,1.12
+top 100 marker genes,Unk_1,1976,94,0,94,0.0
+top 100 marker genes,Endo,10999,95,0,95,0.0
+top 100 marker genes,Oligo_2,940,94,0,94,0.0
+top 100 marker genes,Astro_WM,333,93,11,82,11.83

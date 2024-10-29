@@ -122,14 +122,14 @@ for col, genes in markers_per_type_top.items():
 
 # Read ST cell type annotations from CSV
 st_cell_types_df = pd.read_csv(st_cell_type_path)
-st_cell_types_df.set_index(st_cell_types_df.columns[-2], inplace=True)
+st_cell_types_df.set_index(st_cell_types_df.columns[0], inplace=True)
 st_annotation = st_cell_types_df.columns[-1]
 
 # Exclude cell types with less than <min_cells> cells
 min_cells = 5
-c = Counter(st_cell_types_df[st_cell_types_df.columns[-1]])
+c = Counter(st_cell_types_df[st_annotation])
 exclude_types = {el for el in c.elements() if c[el] <= min_cells}
-st_cell_types_df.loc[:, st_cell_types_df.columns[-1]] = st_cell_types_df[st_cell_types_df.columns[-1]].apply(lambda x: x if x not in exclude_types else "FILTERED")
+st_cell_types_df.loc[:, st_annotation] = st_cell_types_df[st_annotation].apply(lambda x: x if x not in exclude_types else "FILTERED")
 
 # Add annotation from CSV to AnnData so we can calculate marker genes
 adata_st.obs = pd.merge(adata_st.obs, st_cell_types_df, left_index=True, right_index=True)
@@ -160,6 +160,7 @@ logger.info(
 )
 
 report_df = pd.DataFrame(columns=["retention type", "sc_marker_genes", "st_marker_genes", "st_cell_types", "retention percentage"])
+report_per_ctype_df = pd.DataFrame(columns=["Retention type", "Cell type", "Number of cells", "Number of SC marker genes", "Number of ST marker genes", "Number of ST lost genes", "Retention percentage"])
 for sc_dict_name, sc_dict in zip(["unique marker genes", "top 100 marker genes"],
                                  [markers_per_type_reduced_dict, markers_per_type_top]):
 
@@ -190,7 +191,9 @@ for sc_dict_name, sc_dict in zip(["unique marker genes", "top 100 marker genes"]
         dif = marker_genes_sc - len(genes)
         lost_genes += dif
         total_marker_genes_sc += marker_genes_sc
-        # print(ctype, dif)
+        num_of_cells = len(st_cell_types_df[st_cell_types_df[st_annotation] == ctype])
+        report_per_ctype_df.loc[sc_dict_name+ctype, :] = [sc_dict_name, ctype, num_of_cells, marker_genes_sc, len(genes), dif, 
+                                                          np.round(100 * (marker_genes_sc - dif) / marker_genes_sc, 2)]
 
     logger.info(f'Total scRNA {sc_dict_name} that also exist in ST (for {len(markers_st_df.columns)} cell types): {total_marker_genes_sc}')
     logger.info(f'Remained {sc_dict_name}  in ST: {total_marker_genes_sc - lost_genes}')
@@ -204,8 +207,11 @@ for sc_dict_name, sc_dict in zip(["unique marker genes", "top 100 marker genes"]
 reports_path = "data/reports_final/"
 if not os.path.exists(reports_path):
     os.makedirs(reports_path)
-report_df.to_csv(reports_path + st_cell_type_path.split("/")[-1], index=False)
-
+outfname = reports_path + st_cell_type_path.split("/")[-1]
+report_df.to_csv(outfname, index=False)
+outfname_ctype = outfname.replace('.csv', '_per_ctype.csv')
+report_per_ctype_df.to_csv(outfname_ctype, index=False)
+logger.info(f"Results written to {outfname} and {outfname_ctype}.") 
 end_time = time.time()
 total_time = np.round(end_time - start_time, 3)
 logger.info(

@@ -1,0 +1,17 @@
+Retention type,Cell type,Number of cells,Number of SC marker genes,Number of ST marker genes,Number of ST lost genes,Retention percentage
+unique marker genes,Astro_HYPO,10590,437,225,212,51.49
+unique marker genes,Oligo_1,952,579,358,221,61.83
+unique marker genes,Inh_6,67,368,217,151,58.97
+unique marker genes,Astro_WM,605,426,118,308,27.7
+unique marker genes,Nb_1,1824,389,202,187,51.93
+unique marker genes,Oligo_2,166,2170,750,1420,34.56
+unique marker genes,Inh_Meis2_3,224,362,148,214,40.88
+unique marker genes,LowQ_1,540,469,223,246,47.55
+top 100 marker genes,Astro_HYPO,10590,88,55,33,62.5
+top 100 marker genes,Oligo_1,952,88,76,12,86.36
+top 100 marker genes,Inh_6,67,94,60,34,63.83
+top 100 marker genes,Astro_WM,605,93,33,60,35.48
+top 100 marker genes,Nb_1,1824,94,68,26,72.34
+top 100 marker genes,Oligo_2,166,94,67,27,71.28
+top 100 marker genes,Inh_Meis2_3,224,99,60,39,60.61
+top 100 marker genes,LowQ_1,540,89,53,36,59.55

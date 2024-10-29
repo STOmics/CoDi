@@ -1,0 +1,15 @@
+Retention type,Cell type,Number of cells,Number of SC marker genes,Number of ST marker genes,Number of ST lost genes,Retention percentage
+unique marker genes,Oligo_1,8,579,545,34,94.13
+unique marker genes,Astro_AMY_CTX,7,439,289,150,65.83
+unique marker genes,Astro_WM,323,426,262,164,61.5
+unique marker genes,LowQ_1,377,469,312,157,66.52
+unique marker genes,Oligo_2,2595,2170,1261,909,58.11
+unique marker genes,Unk_1,11598,1544,961,583,62.24
+unique marker genes,Ext_Thal_1,41,938,274,664,29.21
+top 100 marker genes,Oligo_1,8,88,83,5,94.32
+top 100 marker genes,Astro_AMY_CTX,7,90,76,14,84.44
+top 100 marker genes,Astro_WM,323,93,56,37,60.22
+top 100 marker genes,LowQ_1,377,89,70,19,78.65
+top 100 marker genes,Oligo_2,2595,94,84,10,89.36
+top 100 marker genes,Unk_1,11598,94,85,9,90.43
+top 100 marker genes,Ext_Thal_1,41,99,33,66,33.33

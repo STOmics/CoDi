@@ -1,0 +1,119 @@
+Retention type,Cell type,Number of cells,Number of SC marker genes,Number of ST marker genes,Number of ST lost genes,Retention percentage
+unique marker genes,Unk_2,269,633,118,515,18.64
+unique marker genes,Ext_Thal_2,528,449,218,231,48.55
+unique marker genes,Inh_Vip,186,190,26,164,13.68
+unique marker genes,Inh_Pvalb,115,609,160,449,26.27
+unique marker genes,Inh_Meis2_3,238,362,93,269,25.69
+unique marker genes,Astro_THAL_hab,249,1112,272,840,24.46
+unique marker genes,Astro_HPC,234,425,118,307,27.76
+unique marker genes,Astro_HYPO,115,437,120,317,27.46
+unique marker genes,Ext_Amy_2,404,478,239,239,50.0
+unique marker genes,Ext_Hpc_CA3,143,327,147,180,44.95
+unique marker genes,Ext_ClauPyr,307,200,80,120,40.0
+unique marker genes,Oligo_1,214,579,221,358,38.17
+unique marker genes,Ext_L23,462,717,299,418,41.7
+unique marker genes,Inh_Meis2_2,285,307,93,214,30.29
+unique marker genes,Astro_STR,353,723,101,622,13.97
+unique marker genes,Ext_Med,195,425,111,314,26.12
+unique marker genes,Astro_THAL_lat,209,476,130,346,27.31
+unique marker genes,Inh_2,185,1125,239,886,21.24
+unique marker genes,Ext_Pir,455,674,317,357,47.03
+unique marker genes,Ext_Hpc_DG2,189,418,146,272,34.93
+unique marker genes,Ext_Unk_2,360,251,46,205,18.33
+unique marker genes,Inh_4,238,1262,331,931,26.23
+unique marker genes,Ext_L25,481,456,160,296,35.09
+unique marker genes,Inh_5,197,250,76,174,30.4
+unique marker genes,Astro_THAL_med,206,480,125,355,26.04
+unique marker genes,Ext_Thal_1,587,938,502,436,53.52
+unique marker genes,LowQ_2,335,177,32,145,18.08
+unique marker genes,Ext_L6,330,284,90,194,31.69
+unique marker genes,Ext_Hpc_CA1,260,433,166,267,38.34
+unique marker genes,Inh_Sst,161,320,55,265,17.19
+unique marker genes,LowQ_1,249,469,210,259,44.78
+unique marker genes,Oligo_2,58,2170,881,1289,40.6
+unique marker genes,Astro_WM,257,426,131,295,30.75
+unique marker genes,Astro_AMY_CTX,232,439,146,293,33.26
+unique marker genes,Ext_L5_1,398,467,183,284,39.19
+unique marker genes,Ext_Amy_1,192,439,146,293,33.26
+unique marker genes,Ext_Hpc_DG1,147,321,185,136,57.63
+unique marker genes,Micro,6,1049,526,523,50.14
+unique marker genes,Ext_L5_3,264,202,44,158,21.78
+unique marker genes,Inh_6,144,368,139,229,37.77
+unique marker genes,Unk_1,814,1544,1316,228,85.23
+unique marker genes,Ext_Unk_3,243,421,154,267,36.58
+unique marker genes,Nb_1,193,389,78,311,20.05
+unique marker genes,Inh_Meis2_4,248,232,60,172,25.86
+unique marker genes,Inh_Lamp5,177,182,29,153,15.93
+unique marker genes,Inh_Meis2_1,108,193,33,160,17.1
+unique marker genes,Astro_CTX,46,419,100,319,23.87
+unique marker genes,Inh_1,453,300,95,205,31.67
+unique marker genes,Ext_Unk_1,224,345,73,272,21.16
+unique marker genes,OPC_1,23,420,126,294,30.0
+unique marker genes,Nb_2,237,480,118,362,24.58
+unique marker genes,Ext_L56,201,563,161,402,28.6
+unique marker genes,Ext_L6B,263,247,60,187,24.29
+unique marker genes,Endo,111,1494,344,1150,23.03
+unique marker genes,Inh_3,583,286,114,172,39.86
+unique marker genes,Ext_L5_2,260,220,89,131,40.45
+unique marker genes,Astro_AMY,42,438,127,311,29.0
+unique marker genes,Ext_Hpc_CA2,58,514,158,356,30.74
+unique marker genes,OPC_2,247,364,111,253,30.49
+top 100 marker genes,Unk_2,269,95,13,82,13.68
+top 100 marker genes,Ext_Thal_2,528,97,61,36,62.89
+top 100 marker genes,Inh_Vip,186,93,49,44,52.69
+top 100 marker genes,Inh_Pvalb,115,97,65,32,67.01
+top 100 marker genes,Inh_Meis2_3,238,99,57,42,57.58
+top 100 marker genes,Astro_THAL_hab,249,95,26,69,27.37
+top 100 marker genes,Astro_HPC,234,88,46,42,52.27
+top 100 marker genes,Astro_HYPO,115,88,42,46,47.73
+top 100 marker genes,Ext_Amy_2,404,98,91,7,92.86
+top 100 marker genes,Ext_Hpc_CA3,143,94,75,19,79.79
+top 100 marker genes,Ext_ClauPyr,307,91,60,31,65.93
+top 100 marker genes,Oligo_1,214,88,69,19,78.41
+top 100 marker genes,Ext_L23,462,98,91,7,92.86
+top 100 marker genes,Inh_Meis2_2,285,95,54,41,56.84
+top 100 marker genes,Astro_STR,353,96,21,75,21.88
+top 100 marker genes,Ext_Med,195,96,43,53,44.79
+top 100 marker genes,Astro_THAL_lat,209,87,53,34,60.92
+top 100 marker genes,Inh_2,185,99,59,40,59.6
+top 100 marker genes,Ext_Pir,455,97,91,6,93.81
+top 100 marker genes,Ext_Hpc_DG2,189,98,53,45,54.08
+top 100 marker genes,Ext_Unk_2,360,95,40,55,42.11
+top 100 marker genes,Inh_4,238,99,45,54,45.45
+top 100 marker genes,Ext_L25,481,97,88,9,90.72
+top 100 marker genes,Inh_5,197,94,32,62,34.04
+top 100 marker genes,Astro_THAL_med,206,87,30,57,34.48
+top 100 marker genes,Ext_Thal_1,587,99,81,18,81.82
+top 100 marker genes,LowQ_2,335,89,26,63,29.21
+top 100 marker genes,Ext_L6,330,97,83,14,85.57
+top 100 marker genes,Ext_Hpc_CA1,260,98,80,18,81.63
+top 100 marker genes,Inh_Sst,161,97,51,46,52.58
+top 100 marker genes,LowQ_1,249,89,57,32,64.04
+top 100 marker genes,Oligo_2,58,94,75,19,79.79
+top 100 marker genes,Astro_WM,257,93,57,36,61.29
+top 100 marker genes,Astro_AMY_CTX,232,90,22,68,24.44
+top 100 marker genes,Ext_L5_1,398,98,91,7,92.86
+top 100 marker genes,Ext_Amy_1,192,95,72,23,75.79
+top 100 marker genes,Ext_Hpc_DG1,147,93,66,27,70.97
+top 100 marker genes,Micro,6,99,57,42,57.58
+top 100 marker genes,Ext_L5_3,264,93,34,59,36.56
+top 100 marker genes,Inh_6,144,94,53,41,56.38
+top 100 marker genes,Unk_1,814,94,75,19,79.79
+top 100 marker genes,Ext_Unk_3,243,97,41,56,42.27
+top 100 marker genes,Nb_1,193,94,12,82,12.77
+top 100 marker genes,Inh_Meis2_4,248,93,40,53,43.01
+top 100 marker genes,Inh_Lamp5,177,93,39,54,41.94
+top 100 marker genes,Inh_Meis2_1,108,95,24,71,25.26
+top 100 marker genes,Astro_CTX,46,90,38,52,42.22
+top 100 marker genes,Inh_1,453,96,71,25,73.96
+top 100 marker genes,Ext_Unk_1,224,96,34,62,35.42
+top 100 marker genes,OPC_1,23,94,36,58,38.3
+top 100 marker genes,Nb_2,237,92,29,63,31.52
+top 100 marker genes,Ext_L56,201,100,75,25,75.0
+top 100 marker genes,Ext_L6B,263,97,36,61,37.11
+top 100 marker genes,Endo,111,95,22,73,23.16
+top 100 marker genes,Inh_3,583,97,47,50,48.45
+top 100 marker genes,Ext_L5_2,260,92,55,37,59.78
+top 100 marker genes,Astro_AMY,42,87,30,57,34.48
+top 100 marker genes,Ext_Hpc_CA2,58,95,54,41,56.84
+top 100 marker genes,OPC_2,247,91,47,44,51.65

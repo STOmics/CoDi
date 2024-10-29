@@ -1,0 +1,531 @@
+Retention type,Cell type,Number of cells,Number of SC marker genes,Number of ST marker genes,Number of ST lost genes,Retention percentage
+unique marker genes,DEINH3,426,35,4,31,11.43
+unique marker genes,RGSZ,725,62,7,55,11.29
+unique marker genes,SCGLU2,197,26,9,17,34.62
+unique marker genes,DEGLU5,483,17,1,16,5.88
+unique marker genes,ACTE2,140,109,24,85,22.02
+unique marker genes,TEGLU2,315,15,0,15,0.0
+unique marker genes,EPEN,58,98,41,57,41.84
+unique marker genes,SZNBL,400,96,14,82,14.58
+unique marker genes,HBSER1,210,17,1,16,5.88
+unique marker genes,HBINH7,100,52,18,34,34.62
+unique marker genes,OBNBL5,223,57,6,51,10.53
+unique marker genes,TEINH9,357,27,0,27,0.0
+unique marker genes,SCGLU1,170,44,12,32,27.27
+unique marker genes,OBINH5,150,37,8,29,21.62
+unique marker genes,VECA,260,23,1,22,4.35
+unique marker genes,TEGLU8,60,99,45,54,45.45
+unique marker genes,HYPEP4,335,25,6,19,24.0
+unique marker genes,PSNP1,54,45,23,22,51.11
+unique marker genes,ENT2,267,14,1,13,7.14
+unique marker genes,HBGLU9,231,21,2,19,9.52
+unique marker genes,MEGLU4,315,11,1,10,9.09
+unique marker genes,MEINH9,278,18,7,11,38.89
+unique marker genes,DEINH5,323,20,1,19,5.0
+unique marker genes,HYPEP8,102,84,22,62,26.19
+unique marker genes,MEINH13,175,7,2,5,28.57
+unique marker genes,OPC,262,67,4,63,5.97
+unique marker genes,HYPEP5,96,30,9,21,30.0
+unique marker genes,MSN2,180,53,12,41,22.64
+unique marker genes,HBINH6,247,15,0,15,0.0
+unique marker genes,TEGLU20,141,19,6,13,31.58
+unique marker genes,PSNP5,254,29,2,27,6.9
+unique marker genes,CBINH1,262,67,19,48,28.36
+unique marker genes,ENT6,236,24,4,20,16.67
+unique marker genes,HBGLU6,297,55,2,53,3.64
+unique marker genes,HBGLU5,309,15,1,14,6.67
+unique marker genes,TEINH18,340,30,7,23,23.33
+unique marker genes,MSN3,146,50,11,39,22.0
+unique marker genes,MEGLU8,401,9,2,7,22.22
+unique marker genes,MSN6,481,44,7,37,15.91
+unique marker genes,ENT4,242,27,3,24,11.11
+unique marker genes,DEGLU1,160,104,26,78,25.0
+unique marker genes,TEGLU5,233,19,2,17,10.53
+unique marker genes,TEINH2,411,37,6,31,16.22
+unique marker genes,DEGLU3,234,70,14,56,20.0
+unique marker genes,TEGLU1,397,9,2,7,22.22
+unique marker genes,DEGLU2,328,58,4,54,6.9
+unique marker genes,EPMB,394,49,7,42,14.29
+unique marker genes,TEGLU11,163,80,10,70,12.5
+unique marker genes,TEINH4,95,31,16,15,51.61
+unique marker genes,HYPEN,246,37,2,35,5.41
+unique marker genes,SCINH9,230,35,5,30,14.29
+unique marker genes,ENT7,193,26,6,20,23.08
+unique marker genes,RGDG,377,40,1,39,2.5
+unique marker genes,ENTG7,157,49,5,44,10.2
+unique marker genes,TEINH8,231,36,6,30,16.67
+unique marker genes,SCINH4,134,54,16,38,29.63
+unique marker genes,HYPEP1,230,19,2,17,10.53
+unique marker genes,HBSER5,224,20,2,18,10.0
+unique marker genes,DEINH7,212,37,8,29,21.62
+unique marker genes,TEINH1,284,39,3,36,7.69
+unique marker genes,HBGLU2,352,18,1,17,5.56
+unique marker genes,SCGLU10,171,41,14,27,34.15
+unique marker genes,MSN1,136,59,15,44,25.42
+unique marker genes,OBNBL3,302,72,11,61,15.28
+unique marker genes,SCGLU5,51,30,19,11,63.33
+unique marker genes,SCINH2,194,17,1,16,5.88
+unique marker genes,HBINH3,284,24,3,21,12.5
+unique marker genes,TEGLU22,354,46,7,39,15.22
+unique marker genes,OBINH4,227,34,3,31,8.82
+unique marker genes,MEINH5,404,19,1,18,5.26
+unique marker genes,HBSER4,222,24,4,20,16.67
+unique marker genes,SCGLU3,160,26,3,23,11.54
+unique marker genes,MEINH1,120,104,27,77,25.96
+unique marker genes,MOL3,193,102,22,80,21.57
+unique marker genes,NFOL2,351,30,4,26,13.33
+unique marker genes,MEINH4,348,8,1,7,12.5
+unique marker genes,SYNOR1,227,39,7,32,17.95
+unique marker genes,SATG2,179,65,11,54,16.92
+unique marker genes,DECHO2,292,19,2,17,10.53
+unique marker genes,PSNF2,163,39,5,34,12.82
+unique marker genes,DEINH8,178,29,6,23,20.69
+unique marker genes,SCGLU6,209,24,4,20,16.67
+unique marker genes,MEGLU10,359,15,1,14,6.67
+unique marker genes,HBCHO2,107,30,7,23,23.33
+unique marker genes,HBINH1,63,128,60,68,46.88
+unique marker genes,MEINH14,63,75,43,32,57.33
+unique marker genes,SCINH6,230,22,3,19,13.64
+unique marker genes,HBGLU3,239,13,3,10,23.08
+unique marker genes,OBDOP2,304,25,2,23,8.0
+unique marker genes,PSNP2,143,29,10,19,34.48
+unique marker genes,PSNP6,182,83,12,71,14.46
+unique marker genes,PSPEP5,163,40,6,34,15.0
+unique marker genes,SYNOR2,192,27,2,25,7.41
+unique marker genes,PSNF3,109,37,6,31,16.22
+unique marker genes,TEINH3,220,23,5,18,21.74
+unique marker genes,VSMCA,76,87,36,51,41.38
+unique marker genes,PSPEP3,283,22,2,20,9.09
+unique marker genes,SCINH11,186,46,7,39,15.22
+unique marker genes,COP2,362,26,4,22,15.38
+unique marker genes,TEGLU23,390,34,2,32,5.88
+unique marker genes,HBGLU10,203,48,13,35,27.08
+unique marker genes,HBSER3,236,10,2,8,20.0
+unique marker genes,PVM2,209,55,10,45,18.18
+unique marker genes,SCINH8,254,35,9,26,25.71
+unique marker genes,MEINH6,82,20,6,14,30.0
+unique marker genes,MOL1,30,152,123,29,80.92
+unique marker genes,PSPEP7,214,21,6,15,28.57
+unique marker genes,ACTE1,247,122,12,110,9.84
+unique marker genes,DETPH,172,141,26,115,18.44
+unique marker genes,PSNP3,32,70,48,22,68.57
+unique marker genes,MEINH10,123,58,22,36,37.93
+unique marker genes,ACMB,155,39,7,32,17.95
+unique marker genes,DEINH6,79,132,51,81,38.64
+unique marker genes,TEGLU24,148,65,14,51,21.54
+unique marker genes,TEGLU19,236,16,0,16,0.0
+unique marker genes,HBINH4,285,20,2,18,10.0
+unique marker genes,MEGLU3,241,15,2,13,13.33
+unique marker genes,PSPEP2,263,20,1,19,5.0
+unique marker genes,SYNOR3,17,98,73,25,74.49
+unique marker genes,CBGRC,39,190,134,56,70.53
+unique marker genes,SCINH7,204,22,2,20,9.09
+unique marker genes,ACNT2,278,111,18,93,16.22
+unique marker genes,SYNOR4,108,64,19,45,29.69
+unique marker genes,HBNOR,89,73,32,41,43.84
+unique marker genes,HYPEP6,58,33,16,17,48.48
+unique marker genes,TEINH7,187,25,4,21,16.0
+unique marker genes,HBINH8,101,71,20,51,28.17
+unique marker genes,TEGLU9,331,15,0,15,0.0
+unique marker genes,MEGLU14,217,20,1,19,5.0
+unique marker genes,ACOB,336,45,5,40,11.11
+unique marker genes,CBNBL1,258,36,4,32,11.11
+unique marker genes,HYPEP3,327,14,2,12,14.29
+unique marker genes,TEGLU17,316,54,1,53,1.85
+unique marker genes,MEGLU5,350,19,2,17,10.53
+unique marker genes,MOL2,12,142,130,12,91.55
+unique marker genes,VLMC2,101,39,11,28,28.21
+unique marker genes,MEINH7,191,27,4,23,14.81
+unique marker genes,PSPEP8,119,28,6,22,21.43
+unique marker genes,SYNOR5,29,32,19,13,59.38
+unique marker genes,TEGLU6,581,22,1,21,4.55
+unique marker genes,ENTG1,580,73,15,58,20.55
+unique marker genes,SCGLU4,192,21,3,18,14.29
+unique marker genes,CR,299,19,0,19,0.0
+unique marker genes,TEGLU15,307,18,3,15,16.67
+unique marker genes,ENT8,195,20,3,17,15.0
+unique marker genes,HBCHO4,138,10,4,6,40.0
+unique marker genes,MEINH2,260,51,10,41,19.61
+unique marker genes,TEINH6,369,24,2,22,8.33
+unique marker genes,OBINH2,231,61,16,45,26.23
+unique marker genes,COP1,236,75,11,64,14.67
+unique marker genes,TEGLU21,249,7,0,7,0.0
+unique marker genes,HBGLU1,193,11,1,10,9.09
+unique marker genes,DGGRC1,458,47,7,40,14.89
+unique marker genes,TEGLU3,56,73,34,39,46.58
+unique marker genes,ENTG4,15,109,89,20,81.65
+unique marker genes,ENT1,98,51,20,31,39.22
+unique marker genes,MEINH3,371,20,2,18,10.0
+unique marker genes,MSN5,407,23,3,20,13.04
+unique marker genes,HBINH2,115,23,7,16,30.43
+unique marker genes,OBNBL2,348,8,1,7,12.5
+unique marker genes,PSPEP1,216,30,1,29,3.33
+unique marker genes,PSNF1,140,30,5,25,16.67
+unique marker genes,MFOL1,80,128,72,56,56.25
+unique marker genes,ENTG2,118,100,24,76,24.0
+unique marker genes,OBINH1,494,26,2,24,7.69
+unique marker genes,TEINH19,116,60,19,41,31.67
+unique marker genes,VECV,122,102,38,64,37.25
+unique marker genes,TECHO,189,7,0,7,0.0
+unique marker genes,SCHW,211,50,5,45,10.0
+unique marker genes,TEGLU13,252,20,1,19,5.0
+unique marker genes,MGL1,114,117,35,82,29.91
+unique marker genes,TEINH20,301,13,0,13,0.0
+unique marker genes,MEGLU2,328,21,0,21,0.0
+unique marker genes,TEGLU7,52,113,52,61,46.02
+unique marker genes,HBINH5,128,65,15,50,23.08
+unique marker genes,MFOL2,170,85,20,65,23.53
+unique marker genes,OBNBL1,231,14,0,14,0.0
+unique marker genes,HBINH9,259,12,1,11,8.33
+unique marker genes,DEINH2,315,16,0,16,0.0
+unique marker genes,CBNBL2,210,68,6,62,8.82
+unique marker genes,OBDOP1,185,30,5,25,16.67
+unique marker genes,TEINH16,470,38,2,36,5.26
+unique marker genes,CBINH2,83,104,44,60,42.31
+unique marker genes,OBINH3,535,46,11,35,23.91
+unique marker genes,DEINH1,394,28,2,26,7.14
+unique marker genes,ENT3,255,23,2,21,8.7
+unique marker genes,ENTG6,298,49,3,46,6.12
+unique marker genes,MGL2,125,96,34,62,35.42
+unique marker genes,NFOL1,139,95,18,77,18.95
+unique marker genes,SEPNBL,393,22,1,21,4.55
+unique marker genes,VLMC1,89,47,21,26,44.68
+unique marker genes,HBGLU7,297,55,3,52,5.45
+unique marker genes,ACBG,319,61,6,55,9.84
+unique marker genes,DEGLU4,231,13,0,13,0.0
+unique marker genes,TEINH12,362,29,0,29,0.0
+unique marker genes,OBNBL4,161,40,6,34,15.0
+unique marker genes,TEINH10,267,65,12,53,18.46
+unique marker genes,TEINH21,174,27,7,20,25.93
+unique marker genes,OEC,98,100,27,73,27.0
+unique marker genes,ENT5,234,29,4,25,13.79
+unique marker genes,HYPEP2,229,56,14,42,25.0
+unique marker genes,MBDOP2,124,5,0,5,0.0
+unique marker genes,MEGLU1,367,24,1,23,4.17
+unique marker genes,ACNT1,41,143,113,30,79.02
+unique marker genes,PSPEP4,231,23,5,18,21.74
+unique marker genes,SCINH5,169,22,5,17,22.73
+unique marker genes,HYPEP7,147,78,21,57,26.92
+unique marker genes,HBSER2,234,27,4,23,14.81
+unique marker genes,TEINH5,310,24,3,21,12.5
+unique marker genes,DGNBL1,391,24,1,23,4.17
+unique marker genes,TEINH15,233,33,10,23,30.3
+unique marker genes,TEINH17,267,18,2,16,11.11
+unique marker genes,ENMFB,350,23,3,20,13.04
+unique marker genes,MEINH12,165,30,9,21,30.0
+unique marker genes,PSNP4,167,26,6,20,23.08
+unique marker genes,TEGLU14,84,17,9,8,52.94
+unique marker genes,SCGLU9,231,39,8,31,20.51
+unique marker genes,MSN4,38,49,36,13,73.47
+unique marker genes,DECHO1,162,18,3,15,16.67
+unique marker genes,PVM1,127,96,28,68,29.17
+unique marker genes,SCGLU7,70,95,47,48,49.47
+unique marker genes,SCINH10,211,30,6,24,20.0
+unique marker genes,ENT9,184,44,14,30,31.82
+unique marker genes,TEGLU18,291,62,5,57,8.06
+unique marker genes,ENTG5,209,60,9,51,15.0
+unique marker genes,MEGLU9,386,8,1,7,12.5
+unique marker genes,DGGRC2,143,76,26,50,34.21
+unique marker genes,MEGLU7,319,10,2,8,20.0
+unique marker genes,MEGLU6,331,15,1,14,6.67
+unique marker genes,ABC,97,17,5,12,29.41
+unique marker genes,CHOR,254,56,9,47,16.07
+unique marker genes,HBGLU8,38,50,34,16,68.0
+unique marker genes,TEGLU12,344,16,0,16,0.0
+unique marker genes,PSPEP6,153,25,2,23,8.0
+unique marker genes,MBDOP1,260,38,6,32,15.79
+unique marker genes,TEGLU10,241,64,4,60,6.25
+unique marker genes,HBCHO1,51,82,41,41,50.0
+unique marker genes,DEINH4,182,19,5,14,26.32
+unique marker genes,ENTG3,184,77,11,66,14.29
+unique marker genes,PER2,302,57,7,50,12.28
+unique marker genes,SCINH3,219,31,5,26,16.13
+unique marker genes,EPSC,336,48,3,45,6.25
+unique marker genes,TEINH13,341,17,2,15,11.76
+unique marker genes,MGL3,39,92,44,48,47.83
+unique marker genes,SATG1,313,60,7,53,11.67
+unique marker genes,PER3,409,31,3,28,9.68
+unique marker genes,TEINH11,194,55,8,47,14.55
+unique marker genes,VECC,388,58,6,52,10.34
+unique marker genes,SCGLU8,54,96,47,49,48.96
+unique marker genes,SYCHO1,112,46,11,35,23.91
+unique marker genes,TEGLU4,300,50,3,47,6.0
+unique marker genes,MBCHO1,238,16,1,15,6.25
+unique marker genes,TEGLU16,169,12,0,12,0.0
+unique marker genes,MEGLU11,312,13,1,12,7.69
+unique marker genes,HBGLU4,39,96,52,44,54.17
+unique marker genes,SYCHO2,28,41,34,7,82.93
+unique marker genes,CBPC,304,94,15,79,15.96
+unique marker genes,HBADR,165,24,6,18,25.0
+unique marker genes,MEINH8,199,30,3,27,10.0
+unique marker genes,HBCHO3,216,37,4,33,10.81
+unique marker genes,DGNBL2,523,76,7,69,9.21
+unique marker genes,PER1,8,108,96,12,88.89
+unique marker genes,TEINH14,397,21,1,20,4.76
+unique marker genes,SCINH1,160,70,15,55,21.43
+unique marker genes,MEINH11,225,12,2,10,16.67
+top 100 marker genes,DEINH3,426,91,40,51,43.96
+top 100 marker genes,RGSZ,725,96,56,40,58.33
+top 100 marker genes,SCGLU2,197,95,54,41,56.84
+top 100 marker genes,DEGLU5,483,93,42,51,45.16
+top 100 marker genes,ACTE2,140,98,71,27,72.45
+top 100 marker genes,TEGLU2,315,97,43,54,44.33
+top 100 marker genes,EPEN,58,94,73,21,77.66
+top 100 marker genes,SZNBL,400,93,53,40,56.99
+top 100 marker genes,HBSER1,210,98,32,66,32.65
+top 100 marker genes,HBINH7,100,90,50,40,55.56
+top 100 marker genes,OBNBL5,223,98,49,49,50.0
+top 100 marker genes,TEINH9,357,97,36,61,37.11
+top 100 marker genes,SCGLU1,170,97,53,44,54.64
+top 100 marker genes,OBINH5,150,98,46,52,46.94
+top 100 marker genes,VECA,260,94,29,65,30.85
+top 100 marker genes,TEGLU8,60,96,53,43,55.21
+top 100 marker genes,HYPEP4,335,95,39,56,41.05
+top 100 marker genes,PSNP1,54,95,72,23,75.79
+top 100 marker genes,ENT2,267,94,47,47,50.0
+top 100 marker genes,HBGLU9,231,95,36,59,37.89
+top 100 marker genes,MEGLU4,315,98,48,50,48.98
+top 100 marker genes,MEINH9,278,96,56,40,58.33
+top 100 marker genes,DEINH5,323,96,35,61,36.46
+top 100 marker genes,HYPEP8,102,97,40,57,41.24
+top 100 marker genes,MEINH13,175,97,47,50,48.45
+top 100 marker genes,OPC,262,92,47,45,51.09
+top 100 marker genes,HYPEP5,96,95,59,36,62.11
+top 100 marker genes,MSN2,180,96,30,66,31.25
+top 100 marker genes,HBINH6,247,97,37,60,38.14
+top 100 marker genes,TEGLU20,141,95,43,52,45.26
+top 100 marker genes,PSNP5,254,98,24,74,24.49
+top 100 marker genes,CBINH1,262,93,52,41,55.91
+top 100 marker genes,ENT6,236,92,37,55,40.22
+top 100 marker genes,HBGLU6,297,97,44,53,45.36
+top 100 marker genes,HBGLU5,309,92,41,51,44.57
+top 100 marker genes,TEINH18,340,93,45,48,48.39
+top 100 marker genes,MSN3,146,96,55,41,57.29
+top 100 marker genes,MEGLU8,401,97,47,50,48.45
+top 100 marker genes,MSN6,481,95,43,52,45.26
+top 100 marker genes,ENT4,242,95,42,53,44.21
+top 100 marker genes,DEGLU1,160,98,46,52,46.94
+top 100 marker genes,TEGLU5,233,94,47,47,50.0
+top 100 marker genes,TEINH2,411,95,55,40,57.89
+top 100 marker genes,DEGLU3,234,95,55,40,57.89
+top 100 marker genes,TEGLU1,397,97,32,65,32.99
+top 100 marker genes,DEGLU2,328,98,43,55,43.88
+top 100 marker genes,EPMB,394,95,32,63,33.68
+top 100 marker genes,TEGLU11,163,93,56,37,60.22
+top 100 marker genes,TEINH4,95,95,69,26,72.63
+top 100 marker genes,HYPEN,246,100,42,58,42.0
+top 100 marker genes,SCINH9,230,94,32,62,34.04
+top 100 marker genes,ENT7,193,98,43,55,43.88
+top 100 marker genes,RGDG,377,97,43,54,44.33
+top 100 marker genes,ENTG7,157,94,61,33,64.89
+top 100 marker genes,TEINH8,231,93,37,56,39.78
+top 100 marker genes,SCINH4,134,97,49,48,50.52
+top 100 marker genes,HYPEP1,230,95,48,47,50.53
+top 100 marker genes,HBSER5,224,94,37,57,39.36
+top 100 marker genes,DEINH7,212,95,50,45,52.63
+top 100 marker genes,TEINH1,284,95,57,38,60.0
+top 100 marker genes,HBGLU2,352,97,49,48,50.52
+top 100 marker genes,SCGLU10,171,94,51,43,54.26
+top 100 marker genes,MSN1,136,93,53,40,56.99
+top 100 marker genes,OBNBL3,302,96,64,32,66.67
+top 100 marker genes,SCGLU5,51,96,66,30,68.75
+top 100 marker genes,SCINH2,194,99,58,41,58.59
+top 100 marker genes,HBINH3,284,97,49,48,50.52
+top 100 marker genes,TEGLU22,354,97,61,36,62.89
+top 100 marker genes,OBINH4,227,96,35,61,36.46
+top 100 marker genes,MEINH5,404,96,35,61,36.46
+top 100 marker genes,HBSER4,222,100,27,73,27.0
+top 100 marker genes,SCGLU3,160,96,40,56,41.67
+top 100 marker genes,MEINH1,120,99,47,52,47.47
+top 100 marker genes,MOL3,193,92,25,67,27.17
+top 100 marker genes,NFOL2,351,98,42,56,42.86
+top 100 marker genes,MEINH4,348,95,41,54,43.16
+top 100 marker genes,SYNOR1,227,93,43,50,46.24
+top 100 marker genes,SATG2,179,98,38,60,38.78
+top 100 marker genes,DECHO2,292,94,51,43,54.26
+top 100 marker genes,PSNF2,163,93,46,47,49.46
+top 100 marker genes,DEINH8,178,94,51,43,54.26
+top 100 marker genes,SCGLU6,209,94,35,59,37.23
+top 100 marker genes,MEGLU10,359,96,53,43,55.21
+top 100 marker genes,HBCHO2,107,93,54,39,58.06
+top 100 marker genes,HBINH1,63,98,61,37,62.24
+top 100 marker genes,MEINH14,63,99,64,35,64.65
+top 100 marker genes,SCINH6,230,97,25,72,25.77
+top 100 marker genes,HBGLU3,239,96,57,39,59.38
+top 100 marker genes,OBDOP2,304,99,42,57,42.42
+top 100 marker genes,PSNP2,143,94,43,51,45.74
+top 100 marker genes,PSNP6,182,96,28,68,29.17
+top 100 marker genes,PSPEP5,163,94,41,53,43.62
+top 100 marker genes,SYNOR2,192,95,41,54,43.16
+top 100 marker genes,PSNF3,109,93,44,49,47.31
+top 100 marker genes,TEINH3,220,97,50,47,51.55
+top 100 marker genes,VSMCA,76,96,51,45,53.12
+top 100 marker genes,PSPEP3,283,95,25,70,26.32
+top 100 marker genes,SCINH11,186,98,34,64,34.69
+top 100 marker genes,COP2,362,95,32,63,33.68
+top 100 marker genes,TEGLU23,390,95,39,56,41.05
+top 100 marker genes,HBGLU10,203,96,46,50,47.92
+top 100 marker genes,HBSER3,236,95,43,52,45.26
+top 100 marker genes,PVM2,209,98,48,50,48.98
+top 100 marker genes,SCINH8,254,95,28,67,29.47
+top 100 marker genes,MEINH6,82,95,44,51,46.32
+top 100 marker genes,MOL1,30,100,81,19,81.0
+top 100 marker genes,PSPEP7,214,93,38,55,40.86
+top 100 marker genes,ACTE1,247,96,66,30,68.75
+top 100 marker genes,DETPH,172,94,48,46,51.06
+top 100 marker genes,PSNP3,32,95,76,19,80.0
+top 100 marker genes,MEINH10,123,94,57,37,60.64
+top 100 marker genes,ACMB,155,92,50,42,54.35
+top 100 marker genes,DEINH6,79,95,54,41,56.84
+top 100 marker genes,TEGLU24,148,97,49,48,50.52
+top 100 marker genes,TEGLU19,236,96,36,60,37.5
+top 100 marker genes,HBINH4,285,96,39,57,40.62
+top 100 marker genes,MEGLU3,241,97,34,63,35.05
+top 100 marker genes,PSPEP2,263,93,34,59,36.56
+top 100 marker genes,SYNOR3,17,97,82,15,84.54
+top 100 marker genes,CBGRC,39,100,65,35,65.0
+top 100 marker genes,SCINH7,204,91,34,57,37.36
+top 100 marker genes,ACNT2,278,96,52,44,54.17
+top 100 marker genes,SYNOR4,108,92,65,27,70.65
+top 100 marker genes,HBNOR,89,96,59,37,61.46
+top 100 marker genes,HYPEP6,58,90,66,24,73.33
+top 100 marker genes,TEINH7,187,91,37,54,40.66
+top 100 marker genes,HBINH8,101,97,47,50,48.45
+top 100 marker genes,TEGLU9,331,95,18,77,18.95
+top 100 marker genes,MEGLU14,217,97,47,50,48.45
+top 100 marker genes,ACOB,336,95,59,36,62.11
+top 100 marker genes,CBNBL1,258,92,34,58,36.96
+top 100 marker genes,HYPEP3,327,97,47,50,48.45
+top 100 marker genes,TEGLU17,316,94,37,57,39.36
+top 100 marker genes,MEGLU5,350,98,37,61,37.76
+top 100 marker genes,MOL2,12,97,81,16,83.51
+top 100 marker genes,VLMC2,101,93,64,29,68.82
+top 100 marker genes,MEINH7,191,94,34,60,36.17
+top 100 marker genes,PSPEP8,119,95,51,44,53.68
+top 100 marker genes,SYNOR5,29,92,77,15,83.7
+top 100 marker genes,TEGLU6,581,90,49,41,54.44
+top 100 marker genes,ENTG1,580,98,48,50,48.98
+top 100 marker genes,SCGLU4,192,97,38,59,39.18
+top 100 marker genes,CR,299,99,34,65,34.34
+top 100 marker genes,TEGLU15,307,93,34,59,36.56
+top 100 marker genes,ENT8,195,96,39,57,40.62
+top 100 marker genes,HBCHO4,138,95,55,40,57.89
+top 100 marker genes,MEINH2,260,92,57,35,61.96
+top 100 marker genes,TEINH6,369,97,42,55,43.3
+top 100 marker genes,OBINH2,231,91,52,39,57.14
+top 100 marker genes,COP1,236,97,38,59,39.18
+top 100 marker genes,TEGLU21,249,98,30,68,30.61
+top 100 marker genes,HBGLU1,193,97,54,43,55.67
+top 100 marker genes,DGGRC1,458,98,56,42,57.14
+top 100 marker genes,TEGLU3,56,98,60,38,61.22
+top 100 marker genes,ENTG4,15,99,79,20,79.8
+top 100 marker genes,ENT1,98,94,55,39,58.51
+top 100 marker genes,MEINH3,371,91,43,48,47.25
+top 100 marker genes,MSN5,407,97,38,59,39.18
+top 100 marker genes,HBINH2,115,95,42,53,44.21
+top 100 marker genes,OBNBL2,348,96,43,53,44.79
+top 100 marker genes,PSPEP1,216,89,35,54,39.33
+top 100 marker genes,PSNF1,140,96,40,56,41.67
+top 100 marker genes,MFOL1,80,99,57,42,57.58
+top 100 marker genes,ENTG2,118,98,54,44,55.1
+top 100 marker genes,OBINH1,494,94,38,56,40.43
+top 100 marker genes,TEINH19,116,98,48,50,48.98
+top 100 marker genes,VECV,122,95,53,42,55.79
+top 100 marker genes,TECHO,189,96,48,48,50.0
+top 100 marker genes,SCHW,211,97,34,63,35.05
+top 100 marker genes,TEGLU13,252,97,26,71,26.8
+top 100 marker genes,MGL1,114,99,44,55,44.44
+top 100 marker genes,TEINH20,301,96,32,64,33.33
+top 100 marker genes,MEGLU2,328,90,48,42,53.33
+top 100 marker genes,TEGLU7,52,96,61,35,63.54
+top 100 marker genes,HBINH5,128,95,62,33,65.26
+top 100 marker genes,MFOL2,170,98,43,55,43.88
+top 100 marker genes,OBNBL1,231,90,46,44,51.11
+top 100 marker genes,HBINH9,259,97,38,59,39.18
+top 100 marker genes,DEINH2,315,94,43,51,45.74
+top 100 marker genes,CBNBL2,210,93,46,47,49.46
+top 100 marker genes,OBDOP1,185,91,57,34,62.64
+top 100 marker genes,TEINH16,470,98,42,56,42.86
+top 100 marker genes,CBINH2,83,94,59,35,62.77
+top 100 marker genes,OBINH3,535,95,54,41,56.84
+top 100 marker genes,DEINH1,394,95,43,52,45.26
+top 100 marker genes,ENT3,255,94,44,50,46.81
+top 100 marker genes,ENTG6,298,95,51,44,53.68
+top 100 marker genes,MGL2,125,98,48,50,48.98
+top 100 marker genes,NFOL1,139,95,56,39,58.95
+top 100 marker genes,SEPNBL,393,95,30,65,31.58
+top 100 marker genes,VLMC1,89,95,67,28,70.53
+top 100 marker genes,HBGLU7,297,96,44,52,45.83
+top 100 marker genes,ACBG,319,97,46,51,47.42
+top 100 marker genes,DEGLU4,231,90,49,41,54.44
+top 100 marker genes,TEINH12,362,97,28,69,28.87
+top 100 marker genes,OBNBL4,161,96,57,39,59.38
+top 100 marker genes,TEINH10,267,95,51,44,53.68
+top 100 marker genes,TEINH21,174,95,47,48,49.47
+top 100 marker genes,OEC,98,97,57,40,58.76
+top 100 marker genes,ENT5,234,94,48,46,51.06
+top 100 marker genes,HYPEP2,229,96,43,53,44.79
+top 100 marker genes,MBDOP2,124,95,55,40,57.89
+top 100 marker genes,MEGLU1,367,94,42,52,44.68
+top 100 marker genes,ACNT1,41,96,63,33,65.62
+top 100 marker genes,PSPEP4,231,97,24,73,24.74
+top 100 marker genes,SCINH5,169,94,29,65,30.85
+top 100 marker genes,HYPEP7,147,98,42,56,42.86
+top 100 marker genes,HBSER2,234,92,37,55,40.22
+top 100 marker genes,TEINH5,310,94,43,51,45.74
+top 100 marker genes,DGNBL1,391,93,38,55,40.86
+top 100 marker genes,TEINH15,233,97,64,33,65.98
+top 100 marker genes,TEINH17,267,96,53,43,55.21
+top 100 marker genes,ENMFB,350,98,30,68,30.61
+top 100 marker genes,MEINH12,165,93,46,47,49.46
+top 100 marker genes,PSNP4,167,95,45,50,47.37
+top 100 marker genes,TEGLU14,84,99,55,44,55.56
+top 100 marker genes,SCGLU9,231,94,42,52,44.68
+top 100 marker genes,MSN4,38,99,78,21,78.79
+top 100 marker genes,DECHO1,162,91,42,49,46.15
+top 100 marker genes,PVM1,127,97,41,56,42.27
+top 100 marker genes,SCGLU7,70,95,63,32,66.32
+top 100 marker genes,SCINH10,211,97,31,66,31.96
+top 100 marker genes,ENT9,184,94,50,44,53.19
+top 100 marker genes,TEGLU18,291,90,51,39,56.67
+top 100 marker genes,ENTG5,209,99,46,53,46.46
+top 100 marker genes,MEGLU9,386,99,31,68,31.31
+top 100 marker genes,DGGRC2,143,99,72,27,72.73
+top 100 marker genes,MEGLU7,319,96,52,44,54.17
+top 100 marker genes,MEGLU6,331,98,31,67,31.63
+top 100 marker genes,ABC,97,92,53,39,57.61
+top 100 marker genes,CHOR,254,92,67,25,72.83
+top 100 marker genes,HBGLU8,38,95,75,20,78.95
+top 100 marker genes,TEGLU12,344,95,49,46,51.58
+top 100 marker genes,PSPEP6,153,94,42,52,44.68
+top 100 marker genes,MBDOP1,260,92,35,57,38.04
+top 100 marker genes,TEGLU10,241,95,27,68,28.42
+top 100 marker genes,HBCHO1,51,98,71,27,72.45
+top 100 marker genes,DEINH4,182,92,45,47,48.91
+top 100 marker genes,ENTG3,184,95,38,57,40.0
+top 100 marker genes,PER2,302,91,44,47,48.35
+top 100 marker genes,SCINH3,219,97,35,62,36.08
+top 100 marker genes,EPSC,336,97,51,46,52.58
+top 100 marker genes,TEINH13,341,98,31,67,31.63
+top 100 marker genes,MGL3,39,96,54,42,56.25
+top 100 marker genes,SATG1,313,94,26,68,27.66
+top 100 marker genes,PER3,409,93,26,67,27.96
+top 100 marker genes,TEINH11,194,95,60,35,63.16
+top 100 marker genes,VECC,388,93,50,43,53.76
+top 100 marker genes,SCGLU8,54,95,61,34,64.21
+top 100 marker genes,SYCHO1,112,95,41,54,43.16
+top 100 marker genes,TEGLU4,300,92,55,37,59.78
+top 100 marker genes,MBCHO1,238,98,31,67,31.63
+top 100 marker genes,TEGLU16,169,93,41,52,44.09
+top 100 marker genes,MEGLU11,312,95,46,49,48.42
+top 100 marker genes,HBGLU4,39,95,68,27,71.58
+top 100 marker genes,SYCHO2,28,97,83,14,85.57
+top 100 marker genes,CBPC,304,93,30,63,32.26
+top 100 marker genes,HBADR,165,94,39,55,41.49
+top 100 marker genes,MEINH8,199,93,43,50,46.24
+top 100 marker genes,HBCHO3,216,92,52,40,56.52
+top 100 marker genes,DGNBL2,523,96,47,49,48.96
+top 100 marker genes,PER1,8,95,85,10,89.47
+top 100 marker genes,TEINH14,397,98,33,65,33.67
+top 100 marker genes,SCINH1,160,98,44,54,44.9
+top 100 marker genes,MEINH11,225,98,44,54,44.9

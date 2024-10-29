@@ -1,0 +1,3 @@
+retention type,sc_marker_genes,st_marker_genes,st_cell_types,retention percentage
+unique marker genes,9324,3110,188,33.35
+top 100 marker genes,17928,11423,188,63.72
