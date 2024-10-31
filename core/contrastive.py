@@ -24,13 +24,15 @@ import torch.nn as nn
 from torch.nn.functional import cosine_similarity
 import torch.nn.functional as F
 from torch.utils.data import Dataset
-from torch.optim import Adam, SGD
+from torch.optim import Adam, SGD, AdamW
 from torch.utils.data import DataLoader
 from tqdm.auto import tqdm
 from sklearn.metrics import accuracy_score, f1_score
 
 from contrastive_augmentation import augment_data
+from utils import plot_embeddings_umap
 from preprocessing import preprocess
+from losses import SupConLoss
 
 dirs = ["loss_curves", "models"]
 for d in dirs:
@@ -54,7 +56,7 @@ class CombinedLoss(nn.Module):
         self.contrastive_weight = torch.tensor(contrastive_weight).to(self.device)
         self.class_weights = class_weights
 
-    def _forward_2(self, z_i, z_j):
+    def _forward_2(self, z_i, z_j, labels):
         """Compute loss using only anchor and positive batches of samples. Negative samples are the 2*(N-1) samples in the batch
 
         Args:
@@ -65,42 +67,83 @@ class CombinedLoss(nn.Module):
             float: loss
         """
         batch_size = z_i.size(0)
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
         # First, one needs to apply an L2 normalization to the features
         z_i = F.normalize(z_i, p=2, dim=1)
         z_j = F.normalize(z_j, p=2, dim=1)
 
-        # compute similarity between the sample's embeddings
-        z = torch.cat([z_i, z_j], dim=0)
-        similarity = cosine_similarity(z.unsqueeze(1), z.unsqueeze(0), dim=2)
-
-        sim_ij = torch.diag(similarity, batch_size)
-        sim_ji = torch.diag(similarity, -batch_size)
-        positives = torch.cat([sim_ij, sim_ji], dim=0)
-
-        mask = (
-            (~torch.eye(batch_size * 2, batch_size * 2, dtype=torch.bool))
-            .float()
-            .to(self.device)
+        contrast_feature = torch.cat([z_i, z_j], dim=0)
+        anchor_count = 2
+        labels = labels.contiguous().view(-1, 1)
+        mask = torch.eq(labels, labels.T).float().to(device)
+        # all strategy
+        dot_contrast = torch.div(
+            torch.matmul(contrast_feature, contrast_feature.T), self.temperature
         )
-        numerator = torch.exp(positives / self.temperature)
-        denominator = mask * torch.exp(similarity / self.temperature)
+        logits_max, _ = torch.max(dot_contrast, dim=1, keepdim=True)
+        logits = dot_contrast - logits_max.detach()
+        mask = mask.repeat(anchor_count, anchor_count)
+        logits_mask = torch.scatter(
+            torch.ones_like(mask),
+            1,
+            torch.arange(batch_size * anchor_count).view(-1, 1).to(device),
+            0,
+        )
+        mask = mask * logits_mask
+        # compute log_prob
+        exp_logits = torch.exp(logits) * logits_mask
+        log_prob = logits - torch.log(exp_logits.sum(1, keepdim=True))
 
-        all_losses = -torch.log(numerator / torch.sum(denominator, dim=1))
-        loss = torch.sum(all_losses) / (2 * batch_size)
+        # compute mean of log-likelihood over positive
+        # modified to handle edge cases when there is no positive pair
+        # for an anchor point.
+        # Edge case e.g.:-
+        # features of shape: [4,1,...]
+        # labels:            [0,1,1,2]
+        # loss before mean:  [nan, ..., ..., nan]
+        mask_pos_pairs = mask.sum(1)
+        mask_pos_pairs = torch.where(mask_pos_pairs < 1e-6, 1, mask_pos_pairs)
+        mean_log_prob_pos = (mask * log_prob).sum(1) / mask_pos_pairs
+
+        # loss
+        loss = -(self.temperature / self.temperature) * mean_log_prob_pos
+        loss = loss.view(anchor_count, batch_size).mean()
+
         return loss
 
+        # # compute similarity between the sample's embeddings
+        # z = torch.cat([z_i, z_j], dim=0)
+        # similarity = cosine_similarity(z.unsqueeze(1), z.unsqueeze(0), dim=2)
+
+        # sim_ij = torch.diag(similarity, batch_size)
+        # sim_ji = torch.diag(similarity, -batch_size)
+        # positives = torch.cat([sim_ij, sim_ji], dim=0)
+
+        # mask = (
+        #     (~torch.eye(batch_size * 2, batch_size * 2, dtype=torch.bool))
+        #     .float()
+        #     .to(self.device)
+        # )
+        # numerator = torch.exp(positives / self.temperature)
+        # denominator = mask * torch.exp(similarity / self.temperature)
+
+        # all_losses = -torch.log(numerator / torch.sum(denominator, dim=1))
+        # loss = torch.sum(all_losses) / (2 * batch_size)
+        # return loss
+
     def forward(self, z_i, z_j, z_k, anchor_target=None, log_reg=None):
-        positive_loss = self._forward_2(z_i, z_j)
+        positive_loss = self._forward_2(z_i, z_j, anchor_target)
         negative_loss = 0
         if torch.is_tensor(z_k):
             negative_loss = 1
         else:
-            for neg in z_k:
-                negative_loss += self._forward_2(z_i, neg)
+            # for neg in z_k:
+            #     negative_loss += self._forward_2(z_i, neg)
+            negative_loss = 1
         contrastive_loss = positive_loss / negative_loss
 
-        if anchor_target is None:
+        if anchor_target is None or log_reg is None:
             log_loss = 0
         else:
             criterion = torch.nn.CrossEntropyLoss(weight=self.class_weights)
@@ -118,7 +161,7 @@ class CombinedLoss(nn.Module):
 class MLP(torch.nn.Sequential):
     """Simple multi-layer perceptron with ReLu activation and optional dropout layer"""
 
-    def __init__(self, input_dim, hidden_dim, n_layers, dropout=0.0):
+    def __init__(self, input_dim, hidden_dim, n_layers, dropout=0.2):
         layers = []
         in_dim = input_dim
         if n_layers < 2:
@@ -126,6 +169,7 @@ class MLP(torch.nn.Sequential):
 
         step = (input_dim - hidden_dim) // (n_layers - 1)
         hidden_sizes = [input_dim - i * step for i in range(1, n_layers)]
+        logger.info(f"Hidden sizes: {hidden_sizes}")
 
         for hidden_dim_size in hidden_sizes:
             layers.append(torch.nn.Linear(in_dim, hidden_dim_size))
@@ -134,7 +178,6 @@ class MLP(torch.nn.Sequential):
             layers.append(nn.PReLU())
             layers.append(torch.nn.Dropout(dropout))
             in_dim = hidden_dim_size
-
         layers.append(torch.nn.Linear(in_dim, hidden_dim))
         super().__init__(*layers)
 
@@ -152,10 +195,11 @@ class DeepEncoder(nn.Module):
         """
         super().__init__()
         self.classifier_depth = classifier_depth
-        self.encoder = MLP(input_dim, emb_dim, encoder_depth, dropout=0.2)
+        self.encoder = MLP(input_dim, emb_dim, encoder_depth, dropout=0.1)
         if self.classifier_depth > 0:
-            self.classifier = MLP(emb_dim, emb_dim, classifier_depth, dropout=0.2)
-        self.linear = torch.nn.Linear(emb_dim, out_dim)
+            self.classifier = MLP(emb_dim, out_dim, classifier_depth, dropout=0.1)
+        # self.linear = torch.nn.Linear(emb_dim, out_dim)
+        self.linear = torch.nn.Identity()
 
         # initialize weights
         self.encoder.apply(self._init_weights)
@@ -168,17 +212,17 @@ class DeepEncoder(nn.Module):
             torch.nn.init.xavier_uniform_(module.weight)
             module.bias.data.fill_(0.01)
 
-    def forward(self, anchor, random_pos, random_neg):
+    def forward(self, anchor, random_pos, random_neg, classify):
         positive = random_pos
         negative = random_neg.permute(1, 0, 2) if random_neg.dim() == 3 else random_neg
 
         # compute embeddings
         emb_anchor = self.encoder(anchor)
-        if self.classifier_depth > 0:
+        if self.classifier_depth > 0 and classify:
             emb_anchor = self.classifier(emb_anchor)
 
         emb_positive = self.encoder(positive)
-        if self.classifier_depth > 0:
+        if self.classifier_depth > 0 and classify:
             emb_positive = self.classifier(emb_positive)
 
         emb_negative = (
@@ -186,7 +230,7 @@ class DeepEncoder(nn.Module):
             if random_neg.dim() == 3
             else self.encoder(negative)
         )
-        if self.classifier_depth > 0:
+        if self.classifier_depth > 0 and classify:
             emb_negative = (
                 [self.classifier(emb_neg) for emb_neg in emb_negative]
                 if random_neg.dim() == 3
@@ -201,6 +245,10 @@ class DeepEncoder(nn.Module):
         emb_anchor = self.encoder(input_data)
         if self.classifier_depth > 0:
             emb_anchor = self.classifier(emb_anchor)
+        return emb_anchor
+
+    def get_embeddings_true(self, input_data):
+        emb_anchor = self.encoder(input_data)
         return emb_anchor
 
     def get_log_reg(self, input_data):
@@ -275,7 +323,7 @@ class ContrastiveEncoder(BaseEstimator, TransformerMixin):
         emb_dim=16,
         encoder_depth=4,
         classifier_depth=2,
-        contrastive_only_perc=0.3,
+        contrastive_only_perc=0.5,
         contrastive_weight=0.8,
         freeze_encoder=True,
         out_dim=1,
@@ -385,25 +433,33 @@ class ContrastiveEncoder(BaseEstimator, TransformerMixin):
         ).to(self.device)
 
         params = [
-            {"params": self.model.encoder.parameters(), "lr": 0.01},
-            {"params": self.model.classifier.parameters(), "lr": 0.001},
+            {
+                "params": self.model.encoder.parameters(),
+                "lr": 3e-4,
+                "weight_decay": 0.01,
+            },
+            {
+                "params": self.model.classifier.parameters(),
+                "lr": 3e-4,
+                "weight_decay": 0.01,
+            },
         ]
 
         optimizer = Adam(params)
         # optimizer = SGD(params, weight_decay=0.1)
         combined_loss = CombinedLoss(
-            class_weights=self.class_weights, temperature=0.5
+            class_weights=self.class_weights, temperature=0.7
         ).to(self.device)
+        # combined_loss = SupConLoss().to(self.device)
 
         train_loss_history_contrastive = []
         train_loss_history_classification = []
         val_loss_history_contrastive = []
         val_loss_history_classification = []
         sum_loss = []
-
         best_val_loss = float("inf")
         no_improvement_count = 0
-        PATIENCE = 15
+        PATIENCE = 5
 
         # scaler = GradScaler()
 
@@ -431,8 +487,10 @@ class ContrastiveEncoder(BaseEstimator, TransformerMixin):
                 optimizer.zero_grad()
 
                 # get embeddings
+                classify = not (epoch <= self.contrastive_only_perc * self.epochs)
+
                 emb_anchor, emb_positive, emb_negative, log_reg = self.model(
-                    anchor, positive, negative
+                    anchor, positive, negative, classify=classify
                 )
 
                 # compute loss
@@ -443,14 +501,15 @@ class ContrastiveEncoder(BaseEstimator, TransformerMixin):
                         for param in self.model.classifier.parameters():
                             param.requires_grad = False
                     loss_contrastive, loss_classification = combined_loss(
-                        emb_anchor, emb_positive, emb_negative
+                        emb_anchor, emb_positive, emb_negative, anchor_target
                     )
+                    loss = loss_contrastive
                 else:
                     #  Take logistic reg loss into account
                     # if self.freeze_encoder:
-                    #     # First, freeze weights of contrastive encoder!
-                    #     for param in self.model.encoder.parameters():
-                    #         param.requires_grad = False
+                    # First, freeze weights of contrastive encoder!
+                    for param in self.model.encoder.parameters():
+                        param.requires_grad = False
                     # unfreeze weights of the classifier to use combined loss
                     if self.freeze_hidden and self.classifier_depth > 0:
                         for param in self.model.classifier.parameters():
@@ -462,7 +521,8 @@ class ContrastiveEncoder(BaseEstimator, TransformerMixin):
                         anchor_target,
                         log_reg,
                     )
-                loss = loss_contrastive + loss_classification
+                    loss = loss_classification
+                # loss = loss_contrastive + loss_classification
                 loss.backward()
 
                 # update model weights
@@ -489,14 +549,14 @@ class ContrastiveEncoder(BaseEstimator, TransformerMixin):
                     )
                     # get embeddings
                     emb_anchor, emb_positive, emb_negative, log_reg = self.model(
-                        anchor, positive, negative
+                        anchor, positive, negative, classify
                     )
 
                     # compute loss
                     if epoch <= self.contrastive_only_perc * self.epochs:
                         # consider only contrastive loss until encoder trains enough
                         contrastive_loss, classification_loss = combined_loss(
-                            emb_anchor, emb_positive, emb_negative
+                            emb_anchor, emb_positive, emb_negative, anchor_target
                         )
                     else:
                         #  Take logistic reg loss into account
@@ -617,6 +677,14 @@ class ContrastiveEncoder(BaseEstimator, TransformerMixin):
     def transform(self, X: np.ndarray, y: Optional[np.ndarray] = None):
         return self._transform_or_predict(self.model.get_embeddings, X, y)
 
+    def get_embeddings(self, X: np.ndarray):
+        embs = self._transform_or_predict(self.model.get_embeddings, X)
+        return embs
+
+    def get_embeddings_true(self, X: np.ndarray):
+        embs = self._transform_or_predict(self.model.get_embeddings_true, X)
+        return embs
+
     def set_params(self, **params):
         if not params:
             return self
@@ -688,13 +756,21 @@ def contrastive_process(
     adata_sc.X = adata_sc.layers["counts"]
 
     # preprocess(adata_sc)
-    adata_sc = augment_data(
-        adata_sc, adata_st, annotation=annotation_sc, percentage=augmentation_perc, logger=logger
-    )
+    # adata_sc = augment_data(
+    #     adata_sc,
+    #     adata_st,
+    #     annotation=annotation_sc,
+    #     percentage=augmentation_perc,
+    #     logger=logger,
+    # )
 
     # perform preprocessing like removing all 0 vectors, normalization and scaling
 
     X = adata_sc.X.toarray()
+    # sc.pp.normalize_total(adata_sc, target_sum=1e4)
+    # sc.pp.log1p(adata_sc)
+    # sc.pp.normalize_total(adata_st, target_sum=1e4)
+    # sc.pp.log1p(adata_st)
     logger.info("Input ready...")
 
     y = adata_sc.obs[annotation_sc]
@@ -735,11 +811,23 @@ def contrastive_process(
         le.inverse_transform(y_true), le.inverse_transform(y_pred), average="macro"
     )
 
+    plot_embeddings_umap(
+        ce,
+        X_test,
+        le.inverse_transform(y_test),
+        os.path.basename(sc_path).replace(".h5ad", "_tsne.png"),
+    )
+
     logger.info("-------------Test data------------")
     logger.info(f"Accuracy: {acc}")
     logger.info(f"F1 macro score: {f1}")
     logger.info("----------------------------------")
 
+    plot_embeddings_umap(
+        ce,
+        adata_st.X.toarray(),
+        figname=os.path.basename(st_path).replace(".h5ad", "_ST_tsne.png"),
+    )
     logger.info("-------------ST prediction------------")
     adata_st.var_names_make_unique()
     if not scipy.sparse.issparse(adata_st.X):
@@ -752,6 +840,7 @@ def contrastive_process(
     df_probabilities = pd.DataFrame(
         data=probabilities, columns=le.classes_, index=adata_st.obs.index
     )
+
     if queue:
         queue.put(df_probabilities)
         queue.put(adata_st.obs["contrastive"])

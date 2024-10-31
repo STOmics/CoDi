@@ -4,6 +4,7 @@ import numpy as np
 import random
 import logging
 import pandas as pd
+import torch
 
 
 def auto_augmentation_perc_estimation(adata_sc: ad.AnnData, adata_st: ad.AnnData):
@@ -126,3 +127,27 @@ def augment_data(
     new_adata.X = csr_matrix(new_adata.X)
 
     return new_adata
+
+
+def augment_st_data(st_data):
+    # # Scale samples
+    # scale_factor = 1 + np.random.uniform(-0.2, 0.2)  # Scale between -10% and +10%
+    # st_data = st_data * scale_factor
+
+    # Add Gaussian noise
+    noise = torch.normal(mean=0.0, std=0.5, size=st_data.size())
+    st_data += noise
+
+    # # Jitter
+    # jitter_level = 0.05
+    # jitter = torch.rand_like(st_data) * jitter_level
+    # st_data += jitter
+
+    # Dropout
+    # dropout_rate = 0.1
+    # mask = (
+    #     np.random.rand(*st_data.shape) < dropout_rate
+    # )  # dropout_rate is a float between 0 and 1
+    # st_data = st_data * mask
+
+    return st_data

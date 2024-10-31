@@ -226,7 +226,7 @@ def main_proc(args, logger, filename):
         from contrastive_v2 import contrastive_process
 
         queue = mp.Queue()
-
+        # mp.set_start_method('spawn')
         contrastive_proc = mp.Process(
             target=contrastive_process,
             kwargs=dict(
@@ -245,6 +245,7 @@ def main_proc(args, logger, filename):
                 logger=logger,
                 queue=queue,
                 wandb_key=args.wandb_key,
+                supervised_loss=args.supervised_loss,
             ),
             name="Contrastive process",
         )
@@ -540,14 +541,14 @@ def main(args=None):
         help="Contrastive: Dimension of the output embeddings. Default is 32.",
         type=int,
         required=False,
-        default=32,
+        default=128,
     )
     parser.add_argument(
         "--enc_depth",
         help="Contrastive: Number of layers in the encoder MLP. Default is 4.",
         type=int,
         required=False,
-        default=5,
+        default=4,
     )
     parser.add_argument(
         "--class_depth",
@@ -595,11 +596,18 @@ def main(args=None):
         default="",
     )
     parser.add_argument(
+        "--supervised_loss",
+        action="store_true",
+        default=False,
+        help="Use supervised contrastive loss",
+    )
+    parser.add_argument(
         "--wandb_key",
         help="Output path to store results.",
         type=str,
         required=False,
         default="66bdf7f04d7842bb591556f5263dd9c779ca1ce7",
+        # default="YOUR_WANDB_KEY",
     )
 
     args = parser.parse_args()
@@ -655,4 +663,5 @@ def main(args=None):
 
 
 if __name__ == "__main__":
+    mp.set_start_method("spawn")
     main()

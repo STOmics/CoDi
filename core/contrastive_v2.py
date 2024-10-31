@@ -10,6 +10,7 @@ import socket
 import os
 from pathlib import Path
 import sys
+import random
 
 
 import anndata as ad
@@ -31,8 +32,9 @@ from torch.utils.data import DataLoader
 from tqdm.auto import tqdm
 from sklearn.utils.class_weight import compute_class_weight
 from sklearn.metrics import accuracy_score, f1_score
+from ignite.metrics import MaximumMeanDiscrepancy
 
-from contrastive_augmentation import augment_data
+from contrastive_augmentation import augment_data, augment_st_data
 from utils import plot_embeddings_umap
 from preprocessing import preprocess
 from losses import SupConLoss
@@ -89,7 +91,7 @@ logger = logging.getLogger(__name__)
 
 
 class SupervisedContrastiveLoss(nn.Module):
-    def __init__(self, temperature=1, contrastive_weight=0.75, class_weights=None):
+    def __init__(self, temperature=0.5, contrastive_weight=0.75, class_weights=None):
         """Loss for contrastive learning using cosine distance as similarity metric.
 
         Args:
@@ -101,7 +103,7 @@ class SupervisedContrastiveLoss(nn.Module):
         self.contrastive_weight = torch.tensor(contrastive_weight).to(self.device)
         self.class_weights = class_weights
 
-    def _forward_2(self, z_i, z_j, labels):
+    def _forward_2(self, z_i, z_j, labels=None):
         """Compute loss using only anchor and positive batches of samples. Negative samples are the 2*(N-1) samples in the batch
 
         Args:
@@ -120,8 +122,11 @@ class SupervisedContrastiveLoss(nn.Module):
 
         contrast_feature = torch.cat([z_i, z_j], dim=0)
         anchor_count = 2
-        labels = labels.contiguous().view(-1, 1)
-        mask = torch.eq(labels, labels.T).float().to(device)
+        if labels is not None:
+            labels = labels.contiguous().view(-1, 1)
+            mask = torch.eq(labels, labels.T).float().to(device)
+        else:
+            mask = torch.eye(batch_size, dtype=torch.float32).to(device)
         # all strategy
         dot_contrast = torch.div(
             torch.matmul(contrast_feature, contrast_feature.T), self.temperature
@@ -153,8 +158,12 @@ class SupervisedContrastiveLoss(nn.Module):
 
         # Apply class weights using the labels as indices
         if self.class_weights is not None:
-            weights = self.class_weights[labels.squeeze().repeat(anchor_count)].to(device)  # get weights for each label in the batch
-            mean_log_prob_pos *= weights.squeeze()  # apply weights to mean log probability
+            weights = self.class_weights[labels.squeeze().repeat(anchor_count)].to(
+                device
+            )  # get weights for each label in the batch
+            mean_log_prob_pos *= (
+                weights.squeeze()
+            )  # apply weights to mean log probability
 
         # loss
         loss = -(self.temperature / self.temperature) * mean_log_prob_pos
@@ -165,20 +174,6 @@ class SupervisedContrastiveLoss(nn.Module):
     def forward(self, z_i, z_j, anchor_target=None):
         positive_loss = self._forward_2(z_i, z_j, anchor_target)
         return positive_loss
-
-        if anchor_target is None or log_reg is None:
-            log_loss = 0
-        else:
-            criterion = torch.nn.CrossEntropyLoss(weight=self.class_weights)
-            log_loss = criterion(log_reg, anchor_target)
-        log_reg_loss = contrastive_loss * self.contrastive_weight + log_loss * (
-            1 - self.contrastive_weight
-        )
-        # return a tuple representing both contrastive and classification loss
-        return (
-            contrastive_loss * self.contrastive_weight,
-            log_loss * (1 - self.contrastive_weight),
-        )
 
 
 class MLP(torch.nn.Sequential):
@@ -199,7 +194,7 @@ class MLP(torch.nn.Sequential):
             # added batch norm before activation func.: https://arxiv.org/abs/1502.03167
             layers.append(torch.nn.BatchNorm1d(hidden_dim_size))
             layers.append(nn.ReLU())
-            layers.append(torch.nn.Dropout(dropout))
+            # layers.append(torch.nn.Dropout(dropout))
             in_dim = hidden_dim_size
         layers.append(torch.nn.Linear(in_dim, hidden_dim))
         super().__init__(*layers)
@@ -224,14 +219,13 @@ class DeepEncoder(nn.Module):
         """
         super().__init__()
         self.classifier_depth = classifier_depth
-        self.encoder = MLP(input_dim, emb_dim, encoder_depth, dropout=0.1)
+        self.encoder = MLP(input_dim, emb_dim, encoder_depth, dropout=0.3)
         if head_type == "linear":
             self.classifier = nn.Linear(emb_dim, out_dim)
         elif head_type == "mlp":
-            self.classifier = MLP(emb_dim, out_dim, classifier_depth, dropout=0.1)
+            self.classifier = MLP(emb_dim, out_dim, classifier_depth, dropout=0.3)
         else:
             raise NotImplementedError(f"Not supported head type: {head_type}")
-        self.linear = torch.nn.Identity()
 
         # initialize weights
         self.encoder.apply(self._init_weights)
@@ -257,23 +251,34 @@ class DeepEncoder(nn.Module):
 
         return emb_anchor, emb_positive
 
-    def get_embeddings(self, input_data):
+    def get_logits(self, input_data):
         emb = self.encoder(input_data)
         emb = self.classifier(emb)
         return emb
 
-    def get_embeddings_true(self, input_data):
+    def get_embeddings(self, input_data):
         emb = self.encoder(input_data)
         return emb
 
     def get_log_reg(self, input_data):
-        emb_anchor = self.get_embeddings(input_data)
-        log_prediction = torch.softmax(self.linear(emb_anchor), dim=1)
-        return log_prediction
+        logits = self.get_logits(input_data)
+        predictions = torch.softmax(logits, dim=1)
+        return predictions
 
     def freeze_encoder_weights(self):
         for param in self.encoder.parameters():
             param.requires_grad = False
+
+
+class STDataset(Dataset):
+    def __init__(self, data):
+        self.data = data
+
+    def __len__(self):
+        return len(self.data)
+
+    def __getitem__(self, index):
+        return self.data[index]
 
 
 class ContrastiveDataset(Dataset):
@@ -333,6 +338,63 @@ class ContrastiveDataset(Dataset):
         return self.data.shape
 
 
+class RBF(nn.Module):
+
+    def __init__(self, n_kernels=5, mul_factor=2.0, bandwidth=None):
+        super().__init__()
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self.bandwidth_multipliers = mul_factor ** (
+            torch.arange(n_kernels) - n_kernels // 2
+        ).to(self.device)
+        self.bandwidth = bandwidth
+
+    def get_bandwidth(self, L2_distances):
+        if self.bandwidth is None:
+            n_samples = L2_distances.shape[0]
+            return L2_distances.data.sum() / (n_samples**2 - n_samples)
+
+        return self.bandwidth
+
+    def forward(self, X):
+        L2_distances = torch.cdist(X, X) ** 2
+        return torch.exp(
+            -L2_distances[None, ...]
+            / (self.get_bandwidth(L2_distances) * self.bandwidth_multipliers)[
+                :, None, None
+            ]
+        ).sum(dim=0)
+
+
+class CosineSimilarityKernel(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+    def forward(self, X):
+        # Normalize X to ensure cosine similarity is valid
+        X_normalized = F.normalize(X, p=2, dim=1)
+        # Compute cosine similarity by taking dot products of normalized vectors
+        cosine_similarity_matrix = torch.mm(X_normalized, X_normalized.T)
+        return cosine_similarity_matrix
+
+
+class MMDLoss(nn.Module):
+
+    def __init__(self, kernel=CosineSimilarityKernel()):
+        super().__init__()
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self.kernel = kernel.to(self.device)
+
+    def forward(self, X, Y):
+        K = self.kernel(torch.vstack([X, Y]))
+
+        X_size = X.shape[0]
+        XX = K[:X_size, :X_size].mean()
+        XY = K[:X_size, X_size:].mean()
+        YY = K[X_size:, X_size:].mean()
+        return XX - 2 * XY + YY
+
+
 class ContrastiveEncoder(BaseEstimator, TransformerMixin):
     def __init__(
         self,
@@ -349,6 +411,8 @@ class ContrastiveEncoder(BaseEstimator, TransformerMixin):
         freeze_hidden=True,
         verbose=0,
         class_weights=None,
+        st_data=None,
+        supervised_loss=False,
     ):
         """Implementation of Contrastive learning encoder with logistic regression.
         It is done by minimizing the contrastive loss of a sample and its positive and negative view.
@@ -386,9 +450,8 @@ class ContrastiveEncoder(BaseEstimator, TransformerMixin):
         self.model = None
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.class_weights = torch.tensor(class_weights).float().to(self.device)
-
-    def train_encoder(self):
-        pass
+        self.st_data = st_data
+        self.supervised_loss = supervised_loss
 
     def fit(self, X: np.ndarray, y: Optional[np.ndarray] = None):
         """Instantiate and train DeepEncoder that will try to minimize the loss between anchor and positive view
@@ -422,6 +485,8 @@ class ContrastiveEncoder(BaseEstimator, TransformerMixin):
             columns=X_val.columns if isinstance(X_val, pd.DataFrame) else None,
         )
 
+        st_ds = STDataset(data=self.st_data)
+
         train_loader = DataLoader(
             self.contr_ds,
             batch_size=self.batch_size,
@@ -441,20 +506,27 @@ class ContrastiveEncoder(BaseEstimator, TransformerMixin):
             prefetch_factor=3,
         )
 
+        st_loader = DataLoader(st_ds, batch_size=self.batch_size // 4, shuffle=True)
+
         self.model = DeepEncoder(
             input_dim=self.contr_ds.shape[1],
             emb_dim=self.emb_dim,
             out_dim=self.out_dim,
-            head_type="linear",
+            head_type="mlp",
             encoder_depth=self.encoder_depth,
             classifier_depth=self.classifier_depth,
         ).to(self.device)
 
         optimizer = Adam(self.model.encoder.parameters(), lr=3e-4, weight_decay=1e-2)
 
-        sup_con_loss = SupervisedContrastiveLoss(
-            class_weights=self.class_weights, temperature=0.5
-        ).to(self.device)
+        if self.supervised_loss:
+            sup_con_loss = SupervisedContrastiveLoss(
+                class_weights=self.class_weights, temperature=0.5
+            ).to(self.device)
+        else:
+            sup_con_loss = SupervisedContrastiveLoss(temperature=0.5).to(self.device)
+
+        mmd_loss = MMDLoss().to(self.device)
 
         ce_loss = torch.nn.CrossEntropyLoss(weight=self.class_weights)
 
@@ -462,7 +534,7 @@ class ContrastiveEncoder(BaseEstimator, TransformerMixin):
             optimizer=optimizer, patience=3, factor=0.5
         )
 
-        early_stopper = EarlyStopper(patience=10)
+        early_stopper = EarlyStopper(patience=5)
 
         # Training loop encoder
         for epoch in range(self.epochs):
@@ -477,13 +549,37 @@ class ContrastiveEncoder(BaseEstimator, TransformerMixin):
                     anchor_target.to(self.device),
                 )
 
+                # Get a batch from the ST dataset for MMD calculation
+                try:
+                    st_batch = next(iter(st_loader))  # Get a batch from ST DataLoader
+                except StopIteration:
+                    # If you run out of ST data, you may want to restart the ST DataLoader
+                    st_loader = DataLoader(
+                        st_ds, batch_size=self.batch_size // 4, shuffle=True
+                    )
+                    st_batch = next(iter(st_loader))
+
+                st_batch = st_batch.to(self.device)
+                # st_anchor, st_positive = torch.split(st_batch, self.batch_size)
+                st_emb, _ = self.model(st_batch, st_batch)
+
                 # reset gradients
                 optimizer.zero_grad()
 
                 # get embeddings
                 emb_anchor, emb_positive = self.model(anchor, positive)
 
-                loss = sup_con_loss(emb_anchor, emb_positive, anchor_target)
+                mmd = mmd_loss(torch.cat([emb_anchor, emb_positive]), st_emb)
+                if self.supervised_loss:
+                    loss = (
+                        sup_con_loss(emb_anchor, emb_positive, anchor_target)
+                        + 0.1 * mmd
+                    )
+                else:
+                    loss = sup_con_loss(emb_anchor, emb_positive) + 0.1 * mmd
+                if random.randint(0, 10) == 3:
+                    wandb.log({"MMD loss": mmd})
+                # loss = sup_con_loss(emb_anchor, emb_positive, anchor_target)
                 loss.backward()
 
                 optimizer.step()
@@ -492,7 +588,6 @@ class ContrastiveEncoder(BaseEstimator, TransformerMixin):
 
             train_loss_contrastive = train_loss_contrastive / len(train_loader)
             wandb.log({"Encoder training loss": train_loss_contrastive})
-            scheduler.step(train_loss_contrastive)
 
             # Validation
             self.model.eval()
@@ -512,7 +607,8 @@ class ContrastiveEncoder(BaseEstimator, TransformerMixin):
                     val_loss_contrastive += loss.item()
 
             val_loss_contrastive = val_loss_contrastive / len(val_loader)
-            wandb.log({"Encoder validation loss": train_loss_contrastive})
+            wandb.log({"Encoder validation loss": val_loss_contrastive})
+            scheduler.step(val_loss_contrastive)
 
             if early_stopper.early_stop(val_loss_contrastive):
                 print(f"Early stopping encoder training in epoch {epoch}...")
@@ -522,11 +618,48 @@ class ContrastiveEncoder(BaseEstimator, TransformerMixin):
                     f"Finished encoder epoch: {epoch} lr: {optimizer.param_groups[0]['lr']}"
                 )
 
+        optimizer = Adam(self.model.encoder.parameters(), lr=1e-4, weight_decay=1e-2)
+        con_loss = SupervisedContrastiveLoss(temperature=0.5).to(self.device)
+        steps_pretraining_sc = self.epochs * len(train_loader)
+        steps_finetuning_st = steps_pretraining_sc * 0.1
+        epochs_finetuning_st = int(steps_finetuning_st / len(st_loader))
+        print(
+            f"Finetuning on ST for steps: {steps_finetuning_st} epochs: {epochs_finetuning_st}"
+        )
+        # Finetuning on ST data
+        for epoch in range(epochs_finetuning_st):
+            self.model.train()
+            finetune_st_loss = 0.0
+
+            for st_batch in st_loader:
+
+                st_batch_positive = augment_st_data(st_batch)
+                st_batch = st_batch.to(self.device)
+                st_batch_positive = st_batch_positive.to(self.device)
+
+                st_emb, st_emb_positive = self.model(st_batch, st_batch_positive)
+
+                # reset gradients
+                optimizer.zero_grad()
+
+                # mmd = mmd_loss(torch.cat([emb_anchor, emb_positive]), st_emb)
+                loss = con_loss(st_emb, st_emb_positive)
+                # loss = sup_con_loss(emb_anchor, emb_positive, anchor_target)
+                loss.backward()
+
+                optimizer.step()
+
+                finetune_st_loss += loss.item()
+
+            print(f"Finished finetuning encoder epoch: {epoch}")
+            finetune_st_loss = finetune_st_loss / len(st_loader)
+            wandb.log({"Encoder ST finetuning loss": finetune_st_loss})
+
         # Training loop classifier
         # setup optimizer and loss function
         self.model.freeze_encoder_weights()
         early_stopper.reset()
-        optimizer = Adam(self.model.classifier.parameters(), lr=3e-4, weight_decay=1e-2)
+        optimizer = Adam(self.model.classifier.parameters(), lr=3e-3, weight_decay=1e-2)
         scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
             optimizer=optimizer, patience=3, factor=0.5
         )
@@ -656,7 +789,7 @@ class ContrastiveEncoder(BaseEstimator, TransformerMixin):
         return embs
 
     def get_embeddings_true(self, X: np.ndarray):
-        embs = self._transform_or_predict(self.model.get_embeddings_true, X)
+        embs = self._transform_or_predict(self.model.get_embeddings, X)
         return embs
 
     def set_params(self, **params):
@@ -682,34 +815,6 @@ def fix_seed(seed):
     torch.cuda.manual_seed(seed)
 
 
-# def plot_loss_curve(ce, path):
-#     fig, axs = plt.subplots(2)
-#     axs[0].plot(ce.train_loss_history_contrastive, label="Training")
-#     axs[0].plot(ce.val_loss_history_contrastive, label="Validation")
-#     axs[1].plot(ce.train_loss_history_classification, label="Training")
-#     axs[1].plot(ce.val_loss_history_classification, label="Validation")
-
-#     plt.title("Model loss")
-#     axs[0].legend(loc="upper left")
-#     axs[1].legend(loc="upper left")
-#     axs[0].set_ylabel("contrastive loss")
-#     axs[0].set_xlabel("epoch")
-#     axs[1].set_ylabel("classification loss")
-#     axs[1].set_xlabel("epoch")
-#     plt.tight_layout()
-#     plt.savefig(path)
-
-#     fig, ax = plt.subplots()
-#     ax.plot(ce.sum_loss, color="black")
-#     ax.set_ylabel("loss")
-#     ax.set_xlabel("epoch")
-#     ax.set_frame_on(False)
-#     plt.tight_layout()
-#     plt.savefig(f"loss_curves/total_loss_size_{timestamp}.png")
-
-#     logger.info(f"Saved the loss curves .png to {path}")
-
-
 def contrastive_process(
     sc_path: str,
     st_path: str,
@@ -725,7 +830,8 @@ def contrastive_process(
     augmentation_perc: float,
     logger: logging.Logger,
     queue=None,
-    wandb_key: str = "66bdf7f04d7842bb591556f5263dd9c779ca1ce7",
+    wandb_key: str = "YOUR_WANDB_KEY",
+    supervised_loss: bool = False,
 ):
     fix_seed(0)
     wandb.login(key=wandb_key)
@@ -733,21 +839,21 @@ def contrastive_process(
     adata_sc.X = adata_sc.layers["counts"]
 
     # preprocess(adata_sc)
-    # adata_sc = augment_data(
-    #     adata_sc,
-    #     adata_st,
-    #     annotation=annotation_sc,
-    #     percentage=augmentation_perc,
-    #     logger=logger,
-    # )
+    adata_sc = augment_data(
+        adata_sc,
+        adata_st,
+        annotation=annotation_sc,
+        percentage=augmentation_perc,
+        logger=logger,
+    )
 
     # perform preprocessing like removing all 0 vectors, normalization and scaling
 
-    X = adata_sc.X.toarray()
-    # sc.pp.normalize_total(adata_sc, target_sum=1e4)
+    sc.pp.normalize_total(adata_sc, target_sum=1e2)
     # sc.pp.log1p(adata_sc)
-    # sc.pp.normalize_total(adata_st, target_sum=1e4)
+    sc.pp.normalize_total(adata_st, target_sum=1e2)
     # sc.pp.log1p(adata_st)
+    X = adata_sc.X.toarray()
     logger.info("Input ready...")
 
     y = adata_sc.obs[annotation_sc]
@@ -768,6 +874,8 @@ def contrastive_process(
         encoder_depth=encoder_depth,
         classifier_depth=classifier_depth,
         class_weights=class_weights,
+        st_data=adata_st.X.toarray(),
+        supervised_loss=supervised_loss,
     )
 
     X_train, X_test, y_train, y_test = train_test_split(
