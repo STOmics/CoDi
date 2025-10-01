@@ -1,36 +1,33 @@
 import argparse as ap
-from collections import Counter
-from collections import defaultdict
 import datetime
 import logging
-from typing import Optional
-import time
-import random
 import os
+import random
 import sys
-
+import time
+from collections import Counter, defaultdict
+from typing import Optional
 
 import anndata as ad
-from matplotlib import pyplot as plt
 import numpy as np
-import scanpy as sc
 import pandas as pd
+import scanpy as sc
 import scipy
-from sklearn.base import BaseEstimator, TransformerMixin
-from sklearn.preprocessing import LabelEncoder
-from sklearn.model_selection import train_test_split
 import torch
 import torch.nn as nn
-from torch.nn.functional import cosine_similarity
 import torch.nn.functional as F
-from torch.utils.data import Dataset
-from torch.optim import Adam, SGD
-from torch.utils.data import DataLoader
-from tqdm.auto import tqdm
-from sklearn.metrics import accuracy_score, f1_score
-
 from contrastive_augmentation import augment_data
+from matplotlib import pyplot as plt
 from preprocessing import preprocess
+from sklearn.base import BaseEstimator, TransformerMixin
+from sklearn.metrics import accuracy_score, f1_score
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import LabelEncoder
+from torch.nn.functional import cosine_similarity
+from torch.optim import SGD, Adam
+from torch.utils.data import DataLoader, Dataset
+from tqdm.auto import tqdm
+from utils import plot_embeddings_umap
 
 dirs = ["loss_curves", "models"]
 for d in dirs:
@@ -197,16 +194,20 @@ class DeepEncoder(nn.Module):
 
         return emb_anchor, emb_positive, emb_negative, log_pred
 
-    def get_embeddings(self, input_data):
-        emb_anchor = self.encoder(input_data)
+    def get_logits(self, input_data):
+        emb = self.encoder(input_data)
         if self.classifier_depth > 0:
-            emb_anchor = self.classifier(emb_anchor)
-        return emb_anchor
+            emb = self.classifier(emb)
+        return emb
+
+    def get_embeddings(self, input_data):
+        emb = self.encoder(input_data)
+        return emb
 
     def get_log_reg(self, input_data):
-        emb_anchor = self.get_embeddings(input_data)
-        log_prediction = torch.softmax(self.linear(emb_anchor), dim=1)
-        return log_prediction
+        logits = self.get_logits(input_data)
+        predictions = torch.softmax(self.linear(logits), dim=1)
+        return predictions
 
 
 class ContrastiveDataset(Dataset):
@@ -617,6 +618,10 @@ class ContrastiveEncoder(BaseEstimator, TransformerMixin):
     def transform(self, X: np.ndarray, y: Optional[np.ndarray] = None):
         return self._transform_or_predict(self.model.get_embeddings, X, y)
 
+    def get_embeddings_true(self, X: np.ndarray):
+        embs = self._transform_or_predict(self.model.get_embeddings, X)
+        return embs
+
     def set_params(self, **params):
         if not params:
             return self
@@ -682,6 +687,7 @@ def contrastive_process(
     filename: str,
     augmentation_perc: float,
     logger: logging.Logger,
+    log_embeddings: bool,
     queue=None,
 ):
     fix_seed(0)
@@ -689,10 +695,16 @@ def contrastive_process(
 
     # preprocess(adata_sc)
     adata_sc = augment_data(
-        adata_sc, adata_st, annotation=annotation_sc, percentage=augmentation_perc, logger=logger
+        adata_sc,
+        adata_st,
+        annotation=annotation_sc,
+        percentage=augmentation_perc,
+        logger=logger,
     )
 
     # perform preprocessing like removing all 0 vectors, normalization and scaling
+    sc.pp.normalize_total(adata_sc, target_sum=1e2)
+    sc.pp.normalize_total(adata_st, target_sum=1e2)
 
     X = adata_sc.X.toarray()
     logger.info("Input ready...")
@@ -735,10 +747,11 @@ def contrastive_process(
         le.inverse_transform(y_true), le.inverse_transform(y_pred), average="macro"
     )
 
-    logger.info("-------------Test data------------")
+    logger.info("-------------Test SC data------------")
     logger.info(f"Accuracy: {acc}")
     logger.info(f"F1 macro score: {f1}")
     logger.info("----------------------------------")
+
 
     logger.info("-------------ST prediction------------")
     adata_st.var_names_make_unique()
@@ -746,9 +759,28 @@ def contrastive_process(
         adata_st.X = scipy.sparse.csr_matrix(adata_st.X)
         logger.info(f"Converted gene exp matrix of ST to csr_matrix")
     y_pred = ce.predict(adata_st.X.toarray())
+
     adata_st.obs["contrastive"] = le.inverse_transform(y_pred)
     adata_st.obs.index.name = "cell_id"
     probabilities = ce.predict_proba(adata_st.X.toarray())
+
+    if log_embeddings:
+        output_name = os.path.splitext(os.path.basename(sc_path))[0]
+        plot_embeddings_umap(
+            ce,
+            X,
+            y,
+            figname=os.path.basename(sc_path).replace(".h5ad", "_SC_UMAP.png"),
+            save_embeddings=True
+        )
+        plot_embeddings_umap(
+            ce,
+            adata_st.X.toarray(),
+            adata_st.obs["contrastive"],
+            figname=os.path.basename(st_path).replace(".h5ad", "_ST_UMAP.png"),
+            save_embeddings=True
+        )
+
     df_probabilities = pd.DataFrame(
         data=probabilities, columns=le.classes_, index=adata_st.obs.index
     )
