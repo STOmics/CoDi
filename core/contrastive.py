@@ -703,8 +703,8 @@ def contrastive_process(
     )
 
     # perform preprocessing like removing all 0 vectors, normalization and scaling
-    sc.pp.normalize_total(adata_sc, target_sum=1e2)
-    sc.pp.normalize_total(adata_st, target_sum=1e2)
+    # sc.pp.normalize_total(adata_sc, target_sum=1e2)
+    # sc.pp.normalize_total(adata_st, target_sum=1e2)
 
     X = adata_sc.X.toarray()
     logger.info("Input ready...")
@@ -773,6 +773,16 @@ def contrastive_process(
             figname=os.path.basename(sc_path).replace(".h5ad", "_SC_UMAP.png"),
             save_embeddings=True
         )
+        # Split path into directory, filename, and extension
+        dir_path, filename = os.path.split(sc_path)
+        basename, ext = os.path.splitext(filename)
+
+        # Build the new output path
+        augmented_path = f"{basename}_AUGMENTED{ext}"
+
+        # Write the AnnData object
+        adata_sc.write_h5ad(augmented_path)
+
         plot_embeddings_umap(
             ce,
             adata_st.X.toarray(),

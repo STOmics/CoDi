@@ -63,7 +63,7 @@ def augment_data(
     counts_per_ct = adata_sc.obs[annotation].value_counts().values
     cts = list(adata_sc.obs[annotation].value_counts().index)
     max_count, min_count = max(counts_per_ct), min(counts_per_ct)
-    upper_bound, lower_bound = int(max_count * 0.75), int(max_count * 0.25)
+    upper_bound, lower_bound = int(max_count * 0.75), int(max_count * 0.25) 
 
     normalized_counts_per_ct = [
         normalize(max_count, min_count, upper_bound, lower_bound, el)

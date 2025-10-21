@@ -198,7 +198,7 @@ def plot_embeddings_umap(ce, X, y=None, figname="umap.png", save_embeddings=Fals
     embs = ce.get_embeddings_true(X)
     embs = embs.cpu().numpy()
     if save_embeddings:
-        embs_name = "embeddings".join(figname.rsplit("UMAP", 1))
+        embs_name = "embeddings".join(figname.rsplit("UMAP.png", 1))
         np.save(embs_name, embs)
 
     for neighs in [20, 50, 100]:
