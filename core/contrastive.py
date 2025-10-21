@@ -703,8 +703,8 @@ def contrastive_process(
     )
 
     # perform preprocessing like removing all 0 vectors, normalization and scaling
-    # sc.pp.normalize_total(adata_sc, target_sum=1e2)
-    # sc.pp.normalize_total(adata_st, target_sum=1e2)
+    sc.pp.normalize_total(adata_sc, target_sum=1e4)
+    sc.pp.normalize_total(adata_st, target_sum=1e4)
 
     X = adata_sc.X.toarray()
     logger.info("Input ready...")
