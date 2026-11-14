@@ -22,5 +22,5 @@ def preprocess(adata):
     expression = (expression.T / (max_vec - min_vec + 10**-6)).T
     # distinction between zeros obtained with scaling vs original zeros
     expression[expression == 0] += 10**-9
-    np.nan_to_num(expression, 0)
+    np.nan_to_num(expression, copy=False)
     adata.X = scipy.sparse.csr_matrix(expression)
