@@ -55,71 +55,76 @@ def binary_distance(p, q):
     return np.sum(p.astype(bool) ^ q.astype(bool))
 
 
-def per_cell(ii, subsets, cell_types, st_df, sc_mean, sc_icms, args):
-    best_matches_subsets = []
-    for subset_id, subset in enumerate(subsets):
-        best_match = {"cell_type": "", "dist": 9999999}
-        for cell_type in cell_types:
-            st_distrib = st_df.iloc[ii, :][subset].values.astype(float)
-            sc_distrib = sc_mean[cell_type][subset_id].values.astype(float)
-            # normalize to sum 1.0 if sum is not 0
-            st_distrib_norm = (
-                st_distrib / np.sum(st_distrib, axis=0, keepdims=True)
-                if np.sum(st_distrib, axis=0, keepdims=True) != 0
-                else st_distrib
-            )
-            sc_distrib_norm = (
-                sc_distrib / np.sum(sc_distrib, axis=0, keepdims=True)
-                if np.sum(sc_distrib, axis=0, keepdims=True) != 0
-                else sc_distrib
-            )
-            if args.distance == "mahalanobis":
-                distance = mahalanobis(
-                    st_distrib_norm,
-                    sc_distrib_norm,
-                    sc_icms[cell_type][subset_id],
-                )
-            elif args.distance == "relativeEntropy":
-                distance = rel_entr(
-                    st_distrib_norm,
-                    sc_distrib_norm,
-                ).sum()
-            elif args.distance == "KLD":
-                distance = kl_div(
-                    st_distrib_norm,
-                    sc_distrib_norm,
-                ).sum()
-            elif args.distance == "wasserstein":
-                distance = wasserstein_distance(
-                    st_distrib_norm,
-                    sc_distrib_norm,
-                )
-            elif args.distance == "hellinger":
-                distance = hellinger(
-                    st_distrib_norm,
-                    sc_distrib_norm,
-                )
-            elif args.distance == "binary":
-                distance = binary_distance(
-                    np.floor(st_distrib),
-                    np.floor(sc_distrib),
-                )
+def normalize_distrib(distrib):
+    """Normalize to sum 1.0 if sum is not 0."""
+    total = np.sum(distrib, axis=0, keepdims=True)
+    return distrib / total if total != 0 else distrib
 
-            if distance < best_match["dist"]:
-                best_match = {"cell_type": cell_type, "dist": distance}
+
+def distances_to_cell_types(distance, st_distrib, st_distrib_norm, ref):
+    """Distances from one ST cell to the mean profile of every cell type.
+
+    Vectorized over cell types: `ref["raw"]` and `ref["norm"]` hold one
+    (precomputed) reference row per cell type for the current gene subset.
+    """
+    if distance == "KLD":
+        return kl_div(st_distrib_norm, ref["norm"]).sum(axis=1)
+    if distance == "relativeEntropy":
+        return rel_entr(st_distrib_norm, ref["norm"]).sum(axis=1)
+    if distance == "hellinger":
+        return np.sum((np.sqrt(st_distrib_norm) - np.sqrt(ref["norm"])) ** 2, axis=1) / np.sqrt(2)
+    if distance == "binary":
+        return np.sum(
+            np.floor(st_distrib).astype(bool) ^ np.floor(ref["raw"]).astype(bool), axis=1
+        )
+    if distance == "mahalanobis":
+        return [
+            mahalanobis(st_distrib_norm, sc_norm, icm)
+            for sc_norm, icm in zip(ref["norm"], ref["icms"])
+        ]
+    if distance == "wasserstein":
+        return [wasserstein_distance(st_distrib_norm, sc_norm) for sc_norm in ref["norm"]]
+
+
+# Read-only state shared with pool workers once (instead of pickling it per task)
+_worker_state = {}
+
+
+def init_worker(state):
+    global _worker_state
+    _worker_state = state
+
+
+def per_cell(ii):
+    distance = _worker_state["distance"]
+    cell_types = _worker_state["cell_types"]
+    st_row = _worker_state["st"][ii]
+
+    best_matches_subsets = []
+    for subset_idx, ref in zip(_worker_state["subset_idx"], _worker_state["refs"]):
+        st_distrib = st_row[subset_idx].astype(float)
+        st_distrib_norm = normalize_distrib(st_distrib)
+        dists = distances_to_cell_types(distance, st_distrib, st_distrib_norm, ref)
+
+        # First cell type with strictly smallest distance below the threshold
+        best_match = {"cell_type": "", "dist": 9999999}
+        for cell_type, dist in zip(cell_types, dists):
+            if dist < best_match["dist"]:
+                best_match = {"cell_type": cell_type, "dist": dist}
         best_matches_subsets.append(best_match)
 
     # Majority voting
+    num_subsets = len(best_matches_subsets)
     cn = Counter([x["cell_type"] for x in best_matches_subsets])
+    winner, winner_count = cn.most_common(1)[0]
     best_match_subset = {
-        "cell_type": cn.most_common(1)[0][0],
-        "confidence": np.round(cn.most_common(1)[0][1] / len(subsets), 3),
+        "cell_type": winner,
+        "confidence": np.round(winner_count / num_subsets, 3),
         "ct_probabilities": [
-            np.round(cn[cellt] / len(subsets), 3) if cellt in cn.keys() else 0.0
+            np.round(cn[cellt] / num_subsets, 3) if cellt in cn else 0.0
             for cellt in cell_types
         ],
     }
-    # pbar.update(1)
     return (ii, best_match_subset)
 
 
@@ -277,18 +282,14 @@ def main_proc(args, logger, filename):
         return  # TODO: Remove this and unite with same code for saving results
 
     # Extract gene expressions only from marker genes  TODO: add to separate function in core/preprocessing.py
-    select_ind = [
-        np.where(adata_sc.var.index == gene)[0][0] for gene in markers_intersect
-    ]
+    select_ind = adata_sc.var.index.get_indexer(markers_intersect)
     sc_df = (
         adata_sc.X.tocsr()[:, select_ind].todense()
         if issparse(adata_sc.X)
         else adata_sc.X[:, select_ind]
     )
     sc_df = pd.DataFrame(sc_df, columns=markers_intersect, index=adata_sc.obs.index)
-    select_ind = [
-        np.where(adata_st.var.index == gene)[0][0] for gene in markers_intersect
-    ]
+    select_ind = adata_st.var.index.get_indexer(markers_intersect)
     st_df = (
         adata_st.X.tocsr()[:, select_ind].todense()
         if issparse(adata_st.X)
@@ -311,8 +312,9 @@ def main_proc(args, logger, filename):
     for ty in cell_types:
         sc_icms[ty] = []
         sc_mean[ty] = []
+        ty_df = sc_df[adata_sc.obs[args.annotation] == ty]
         for sub_id, subset in enumerate(subsets):
-            subset_df = sc_df[adata_sc.obs[args.annotation] == ty][subset]
+            subset_df = ty_df[subset]
             if args.distance == "mahalanobis":
                 cm = np.cov(
                     subset_df.values, rowvar=False
@@ -324,33 +326,40 @@ def main_proc(args, logger, filename):
                 subset_df.mean()
             )  # ...because of presence of genes with all zero values per cell type
 
+    # Stack per-subset references into (n_cell_types, subset_size) matrices,
+    # normalized once here instead of once per ST cell
+    refs = []
+    for sub_id in range(num_of_subsets):
+        raw = [sc_mean[ty][sub_id].values.astype(float) for ty in cell_types]
+        refs.append(
+            {
+                "raw": np.vstack(raw),
+                "norm": np.vstack([normalize_distrib(r) for r in raw]),
+                "icms": [sc_icms[ty][sub_id] for ty in cell_types]
+                if args.distance == "mahalanobis"
+                else None,
+            }
+        )
+
     # *****************************************
     # For all ST cells, for all subsets, for all cell types
     # *****************************************
     num_cpus_used = mp.cpu_count() if args.n_jobs == -1 else args.n_jobs
-    assigned_types = []
-
-    iis = [ii for ii in range(len(st_df))]
+    worker_state = {
+        "distance": args.distance,
+        "cell_types": cell_types,
+        "st": st_df.to_numpy(),
+        "subset_idx": [st_df.columns.get_indexer(subset) for subset in subsets],
+        "refs": refs,
+    }
 
     logger.info(f"Starting parallel per cell calculation of distances.")
-    # pbar = tqdm(total=len(st_df))
-    with mp.Pool(processes=num_cpus_used) as pool:
-        assigned_types = pool.starmap(
-            per_cell,
-            zip(
-                iis,
-                repeat(subsets),
-                repeat(cell_types),
-                repeat(st_df),
-                repeat(sc_mean),
-                repeat(sc_icms),
-                repeat(args),
-            ),
-            chunksize=30,
-        )
+    with mp.Pool(
+        processes=num_cpus_used, initializer=init_worker, initargs=(worker_state,)
+    ) as pool:
+        assigned_types = pool.map(per_cell, range(len(st_df)), chunksize=30)
 
-    assigned_types.sort(key=lambda x: x[0])
-    assigned_types = [at[1] for at in assigned_types]
+    assigned_types = [at[1] for at in assigned_types]  # pool.map preserves order
     adata_st.obs["CoDi_dist"] = [x["cell_type"] for x in assigned_types]
     adata_st.obs["CoDi_confidence_dist"] = [x["confidence"] for x in assigned_types]
     adata_st.obsm["probabilities_dist"].iloc[:, :] = [
@@ -365,10 +374,9 @@ def main_proc(args, logger, filename):
         adata_st.obsm["probabilities_contrastive"] = df_probabilities
         predictions = queue.get()
         adata_st.obs["CoDi_contrastive"] = predictions
-        adata_st.obs["CoDi_confidence_contrastive"] = [
-            np.round(prow.max(), 3)
-            for _, prow in adata_st.obsm["probabilities_contrastive"].iterrows()
-        ]
+        adata_st.obs["CoDi_confidence_contrastive"] = np.round(
+            np.nanmax(adata_st.obsm["probabilities_contrastive"].to_numpy(), axis=1), 3
+        )
         contrastive_proc.join()
 
     # combine contrastive and distance results TODO: Add to separate function in core/util.py
@@ -379,13 +387,12 @@ def main_proc(args, logger, filename):
         adata_st.obsm["probabilities"] = (
             adata_st.obsm["probabilities_contrastive"] * (1.0 - args.dist_prob_weight)
         ).add(adata_st.obsm["probabilities_dist"] * args.dist_prob_weight)
+        probabilities = adata_st.obsm["probabilities"]
+        prob_values = probabilities.to_numpy()
         adata_st.obs["CoDi"] = np.array(
-            [prow.idxmax() for _, prow in adata_st.obsm["probabilities"].iterrows()]
+            probabilities.columns[np.nanargmax(prob_values, axis=1)]
         ).astype("str")
-        adata_st.obs["CoDi_confidence"] = [
-            np.round(prow.max(), 3)
-            for _, prow in adata_st.obsm["probabilities"].iterrows()
-        ]
+        adata_st.obs["CoDi_confidence"] = np.round(np.nanmax(prob_values, axis=1), 3)
     else:
         adata_st.obs["CoDi"] = adata_st.obs["CoDi_dist"]
         adata_st.obs["CoDi_confidence"] = adata_st.obs["CoDi_confidence_dist"]

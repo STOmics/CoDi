@@ -216,15 +216,11 @@ class ContrastiveDataset(Dataset):
         self.target = np.array(target)
         unique_targets = np.unique(target)
         self.target_to_group = defaultdict(list)
-        for ut in unique_targets:
-            self.target_to_group[ut] = [
-                ind for ind, element in enumerate((target == ut)) if element
-            ]
         self.target_to_opposite = defaultdict(list)
         for ut in unique_targets:
-            self.target_to_opposite[ut] = [
-                ind for ind, element in enumerate((target != ut)) if element
-            ]
+            is_ut = target == ut
+            self.target_to_group[ut] = np.flatnonzero(is_ut).tolist()
+            self.target_to_opposite[ut] = np.flatnonzero(~is_ut).tolist()
         self.columns = columns
         self.num_of_negatives = num_of_negatives
 
@@ -758,11 +754,13 @@ def contrastive_process(
     if not scipy.sparse.issparse(adata_st.X):
         adata_st.X = scipy.sparse.csr_matrix(adata_st.X)
         logger.info(f"Converted gene exp matrix of ST to csr_matrix")
-    y_pred = ce.predict(adata_st.X.toarray())
+    X_st = adata_st.X.toarray()
+    # Single forward pass: predict() is argmax over the same softmax output
+    probabilities = ce.predict_proba(X_st)
+    y_pred = np.argmax(probabilities, axis=1)
 
     adata_st.obs["contrastive"] = le.inverse_transform(y_pred)
     adata_st.obs.index.name = "cell_id"
-    probabilities = ce.predict_proba(adata_st.X.toarray())
 
     if log_embeddings:
         output_name = os.path.splitext(os.path.basename(sc_path))[0]
@@ -785,7 +783,7 @@ def contrastive_process(
 
         plot_embeddings_umap(
             ce,
-            adata_st.X.toarray(),
+            X_st,
             adata_st.obs["contrastive"],
             figname=os.path.basename(st_path).replace(".h5ad", "_ST_UMAP.png"),
             save_embeddings=True

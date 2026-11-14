@@ -82,47 +82,41 @@ def augment_data(
     ]
     genes = adata_sc.shape[1]
     scaled_total_new_cells = sum(x[0] for x in resampling_class_size)
+    # Fill a plain numpy buffer row by row (writing through AnnData views is slow)
     counts = np.zeros((scaled_total_new_cells, genes), dtype=np.int16)
+    labels = []
+
+    X_sc = csr_matrix(adata_sc.X)
+    obs_names = adata_sc.obs_names
+    ct_labels = adata_sc.obs[annotation].values
+
+    ind = 0
+    for new_size, original_size, label in resampling_class_size:
+        ct_obs_names = obs_names[ct_labels == label]
+        if new_size <= original_size:
+            # take unique cells and mutate
+            selected_cells = random.sample(list(ct_obs_names), k=new_size)
+        else:
+            # you have to oversample by duplicating, draw random samples with replacement
+            selected_cells = random.choices(ct_obs_names, k=new_size)
+        rows = obs_names.get_indexer(selected_cells)
+        for row in rows:
+            labels.append(label)
+            to_mutate = X_sc[row].toarray().astype(np.int16)[0]
+            non_zero_indices = np.nonzero(to_mutate)
+            num_elements_to_zero = int(percentage * len(non_zero_indices[0]))
+            selected_indices = random.sample(
+                list(non_zero_indices[0]), k=num_elements_to_zero
+            )
+            to_mutate[selected_indices] = 0
+            counts[ind] = to_mutate
+            ind += 1
 
     new_adata = ad.AnnData(counts)
     new_adata.var_names = adata_sc.var_names
-    new_adata.obs[annotation] = pd.Series(np.empty(scaled_total_new_cells), dtype=str)
-
-    ind = 0
-    genes = adata_sc.shape[1]
-
-    for new_size, original_size, label in resampling_class_size:
-        if new_size <= original_size:
-            # take unique cells and mutate
-            adata_single_ct = adata_sc[adata_sc.obs[annotation] == label, :]
-            for obs_name in random.sample(list(adata_single_ct.obs_names), k=new_size):
-                new_adata.obs[annotation].iloc[ind] = label
-                to_mutate = adata_sc[obs_name].X.toarray().astype(np.int16)[0]
-                non_zero_indices = np.nonzero(to_mutate)
-                num_elements_to_zero = int(percentage * len(non_zero_indices[0]))
-                selected_indices = random.sample(
-                    list(non_zero_indices[0]), k=num_elements_to_zero
-                )
-                to_mutate[selected_indices] = 0
-                new_adata[ind].X = to_mutate
-                ind += 1
-        else:
-            # you have to oversample by duplicating, draw random samples with replacement
-            adata_single_ct = adata_sc[adata_sc.obs[annotation] == label, :]
-            for obs_name in random.choices(adata_single_ct.obs_names, k=new_size):
-                # mutate here
-                new_adata.obs[annotation].iloc[ind] = label
-                to_mutate = adata_sc[obs_name].X.toarray().astype(np.int16)[0]
-                non_zero_indices = np.nonzero(to_mutate)
-                num_elements_to_zero = int(percentage * len(non_zero_indices[0]))
-                selected_indices = random.sample(
-                    list(non_zero_indices[0]), k=num_elements_to_zero
-                )
-                to_mutate[selected_indices] = 0
-                new_adata[ind].X = to_mutate
-                ind += 1
-
-    new_adata.obs[annotation] = new_adata.obs[annotation].astype("category")
+    new_adata.obs[annotation] = pd.Series(
+        labels, index=new_adata.obs_names, dtype=object
+    ).astype("category")
     new_adata.X = csr_matrix(new_adata.X)
 
     return new_adata
