@@ -5,54 +5,63 @@ import multiprocessing as mp
 import os
 import random
 import subprocess
-import sys
 import time
 import warnings
 from collections import Counter
-from itertools import repeat
 
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import scanpy as sc
 import seaborn as sns
-from matplotlib.axes import Axes
-from memory_profiler import memory_usage
 from scipy.sparse import issparse
 from scipy.spatial.distance import mahalanobis
 from scipy.special import kl_div, rel_entr
-from scipy.stats import entropy, wasserstein_distance
+from scipy.stats import wasserstein_distance
 
 random.seed(3)
-# Suppress the warning
 warnings.filterwarnings("ignore", message=".*Some cells have zero counts.*")
 warnings.filterwarnings("ignore", message=".*invalid value encountered in log1p*.")
 warnings.filterwarnings("ignore", message=".*is_categorical_dtype is deprecated.*")
 warnings.filterwarnings("ignore", message=".*Variable names are not unique.*")
 
+DISTANCE_METRICS = {
+    "mahalanobis",
+    "KLD",
+    "wasserstein",
+    "relativeEntropy",
+    "hellinger",
+    "binary",
+    "none",
+}
+NUM_SUBSETS = 10
+MAX_DISTANCE = 9999999  # A cell type matches only if its distance is below this
+POOL_CHUNKSIZE = 30
 
-def create_subsets(gene_set, num_of_subsets=10):
+
+# ---------------------------------------------------------------------------
+# Distance-based annotation
+# ---------------------------------------------------------------------------
+def create_subsets(gene_set, num_of_subsets=NUM_SUBSETS):
+    """Draw random gene subsets, each covering 30%-80% of `gene_set`."""
     num_of_elem = len(gene_set)
     subsets = []
-    for s in range(num_of_subsets):
+    for _ in range(num_of_subsets):
         subset_size = random.randint(int(num_of_elem * 0.3), int(num_of_elem * 0.8))
         subsets.append(random.sample(gene_set, subset_size))
     return subsets
 
 
 def hellinger(p, q):
-    """Hellinger distance between distributions"""
-    p = np.array(p)
-    q = np.array(q)
-    result = np.sum((np.sqrt(p) - np.sqrt(q)) ** 2) / np.sqrt(2)
-    return result
+    """Hellinger distance between distributions (row-wise if `q` is 2D)."""
+    return np.sum((np.sqrt(p) - np.sqrt(q)) ** 2, axis=-1) / np.sqrt(2)
 
 
 def binary_distance(p, q):
-    """Binary distance between distributions.
-    Sum all the positional pairs in both distributions which are
-    of different status: one zero, while other nonzero."""
-    return np.sum(p.astype(bool) ^ q.astype(bool))
+    """Binary distance between distributions (row-wise if `q` is 2D).
+
+    Counts positional pairs of different status: one zero, the other nonzero."""
+    return np.sum(p.astype(bool) ^ q.astype(bool), axis=-1)
 
 
 def normalize_distrib(distrib):
@@ -64,19 +73,23 @@ def normalize_distrib(distrib):
 def distances_to_cell_types(distance, st_distrib, st_distrib_norm, ref):
     """Distances from one ST cell to the mean profile of every cell type.
 
-    Vectorized over cell types: `ref["raw"]` and `ref["norm"]` hold one
-    (precomputed) reference row per cell type for the current gene subset.
+    Args:
+        distance: Name of the distance metric.
+        st_distrib: Raw expression of the cell on the subset genes, shape (k,).
+        st_distrib_norm: `st_distrib` normalized to sum 1.0, shape (k,).
+        ref: Subset reference from `build_references`.
+
+    Returns:
+        One distance per cell type.
     """
     if distance == "KLD":
         return kl_div(st_distrib_norm, ref["norm"]).sum(axis=1)
     if distance == "relativeEntropy":
         return rel_entr(st_distrib_norm, ref["norm"]).sum(axis=1)
     if distance == "hellinger":
-        return np.sum((np.sqrt(st_distrib_norm) - np.sqrt(ref["norm"])) ** 2, axis=1) / np.sqrt(2)
+        return hellinger(st_distrib_norm, ref["norm"])
     if distance == "binary":
-        return np.sum(
-            np.floor(st_distrib).astype(bool) ^ np.floor(ref["raw"]).astype(bool), axis=1
-        )
+        return binary_distance(np.floor(st_distrib), np.floor(ref["raw"]))
     if distance == "mahalanobis":
         return [
             mahalanobis(st_distrib_norm, sc_norm, icm)
@@ -84,9 +97,19 @@ def distances_to_cell_types(distance, st_distrib, st_distrib_norm, ref):
         ]
     if distance == "wasserstein":
         return [wasserstein_distance(st_distrib_norm, sc_norm) for sc_norm in ref["norm"]]
+    raise ValueError(f"Unknown distance metric: {distance}")
 
 
-# Read-only state shared with pool workers once (instead of pickling it per task)
+def closest_cell_type(cell_types, dists):
+    """First cell type with the smallest distance below MAX_DISTANCE, else ""."""
+    best_type, best_dist = "", MAX_DISTANCE
+    for cell_type, dist in zip(cell_types, dists):
+        if dist < best_dist:
+            best_type, best_dist = cell_type, dist
+    return best_type
+
+
+# Read-only state shared with pool workers once, via the pool initializer
 _worker_state = {}
 
 
@@ -96,36 +119,240 @@ def init_worker(state):
 
 
 def per_cell(ii):
-    distance = _worker_state["distance"]
+    """Annotate ST cell `ii` by majority vote over the gene subsets.
+
+    Returns:
+        (cell type, confidence, per cell type vote share)
+    """
     cell_types = _worker_state["cell_types"]
     st_row = _worker_state["st"][ii]
 
-    best_matches_subsets = []
+    votes = []
     for subset_idx, ref in zip(_worker_state["subset_idx"], _worker_state["refs"]):
         st_distrib = st_row[subset_idx].astype(float)
-        st_distrib_norm = normalize_distrib(st_distrib)
-        dists = distances_to_cell_types(distance, st_distrib, st_distrib_norm, ref)
+        dists = distances_to_cell_types(
+            _worker_state["distance"], st_distrib, normalize_distrib(st_distrib), ref
+        )
+        votes.append(closest_cell_type(cell_types, dists))
 
-        # First cell type with strictly smallest distance below the threshold
-        best_match = {"cell_type": "", "dist": 9999999}
-        for cell_type, dist in zip(cell_types, dists):
-            if dist < best_match["dist"]:
-                best_match = {"cell_type": cell_type, "dist": dist}
-        best_matches_subsets.append(best_match)
+    num_votes = len(votes)
+    counts = Counter(votes)
+    winner, winner_count = counts.most_common(1)[0]
+    vote_shares = [
+        np.round(counts[ct] / num_votes, 3) if ct in counts else 0.0 for ct in cell_types
+    ]
+    return winner, np.round(winner_count / num_votes, 3), vote_shares
 
-    # Majority voting
-    num_subsets = len(best_matches_subsets)
-    cn = Counter([x["cell_type"] for x in best_matches_subsets])
-    winner, winner_count = cn.most_common(1)[0]
-    best_match_subset = {
-        "cell_type": winner,
-        "confidence": np.round(winner_count / num_subsets, 3),
-        "ct_probabilities": [
-            np.round(cn[cellt] / num_subsets, 3) if cellt in cn else 0.0
-            for cellt in cell_types
-        ],
+
+def marker_expression(adata, markers):
+    """Dense DataFrame of `adata.X` restricted to `markers` (in that order)."""
+    select_ind = adata.var.index.get_indexer(markers)
+    X = (
+        adata.X.tocsr()[:, select_ind].todense()
+        if issparse(adata.X)
+        else adata.X[:, select_ind]
+    )
+    return pd.DataFrame(X, columns=markers, index=adata.obs.index)
+
+
+def build_references(sc_df, sc_labels, cell_types, subsets, distance):
+    """Per gene subset: mean profile of every cell type, raw and normalized.
+
+    Each reference holds (n_cell_types, subset_size) matrices "raw" and "norm",
+    plus inverse covariance matrices "icms" for the Mahalanobis distance.
+    """
+    sc_mean = {}
+    sc_icms = {}
+    for ty in cell_types:
+        ty_df = sc_df[sc_labels == ty]
+        sc_mean[ty] = []
+        sc_icms[ty] = []
+        for subset in subsets:
+            subset_df = ty_df[subset]
+            if distance == "mahalanobis":
+                # Pseudo inverse avoids singular matrices caused by genes
+                # with all zero values per cell type
+                cov = np.cov(subset_df.values, rowvar=False)
+                sc_icms[ty].append(np.linalg.pinv(cov))
+            sc_mean[ty].append(subset_df.mean().values.astype(float))
+
+    refs = []
+    for sub_id in range(len(subsets)):
+        raw = [sc_mean[ty][sub_id] for ty in cell_types]
+        refs.append(
+            {
+                "raw": np.vstack(raw),
+                "norm": np.vstack([normalize_distrib(r) for r in raw]),
+                "icms": [sc_icms[ty][sub_id] for ty in cell_types]
+                if distance == "mahalanobis"
+                else None,
+            }
+        )
+    return refs
+
+
+def run_distance(args, adata_sc, adata_st, markers, logger):
+    """Distance-based annotation of all ST cells; results go into `adata_st`."""
+    sc_df = marker_expression(adata_sc, markers)
+    st_df = marker_expression(adata_st, markers)
+    cell_types = list(sorted(adata_sc.obs[args.annotation].unique()))
+    adata_st.obsm["probabilities_dist"] = pd.DataFrame(
+        index=adata_st.obs.index, columns=cell_types
+    ).astype("float32")
+
+    subsets = create_subsets(markers, num_of_subsets=NUM_SUBSETS)
+    worker_state = {
+        "distance": args.distance,
+        "cell_types": cell_types,
+        "st": st_df.to_numpy(),
+        "subset_idx": [st_df.columns.get_indexer(subset) for subset in subsets],
+        "refs": build_references(
+            sc_df, adata_sc.obs[args.annotation], cell_types, subsets, args.distance
+        ),
     }
-    return (ii, best_match_subset)
+
+    num_cpus_used = mp.cpu_count() if args.n_jobs == -1 else args.n_jobs
+    logger.info("Starting parallel per cell calculation of distances.")
+    with mp.Pool(
+        processes=num_cpus_used, initializer=init_worker, initargs=(worker_state,)
+    ) as pool:
+        results = pool.map(per_cell, range(len(st_df)), chunksize=POOL_CHUNKSIZE)
+
+    labels, confidences, vote_shares = zip(*results)
+    adata_st.obs["CoDi_dist"] = list(labels)
+    adata_st.obs["CoDi_confidence_dist"] = list(confidences)
+    adata_st.obsm["probabilities_dist"].iloc[:, :] = list(vote_shares)
+
+
+# ---------------------------------------------------------------------------
+# Pipeline steps
+# ---------------------------------------------------------------------------
+def load_data(sc_path, st_path):
+    adata_sc = sc.read_h5ad(sc_path)
+    adata_st = sc.read_h5ad(st_path)
+    adata_sc.var_names_make_unique()
+    adata_st.var_names_make_unique()
+    adata_sc.obs_names_make_unique()
+    adata_st.obs_names_make_unique()
+
+    # Spatial coordinates are expected in 'spatial', 'X_spatial' or 'spatial_stereoseq'
+    if "X_spatial" in adata_st.obsm:
+        adata_st.obsm["spatial"] = adata_st.obsm["X_spatial"].copy()
+    elif "spatial_stereoseq" in adata_st.obsm:
+        adata_st.obsm["spatial"] = np.array(adata_st.obsm["spatial_stereoseq"].copy())
+    elif "spatial" not in adata_st.obsm:
+        warnings.warn(
+            'Spatial coordinates not found. Labels expected in: \
+                .obsm["spatial"] or\n \
+                .obsm["X_spatial"] or\n \
+                .obsm["spatial_stereoseq"]'
+        )
+    return adata_sc, adata_st
+
+
+def compute_marker_genes(adata_sc, adata_st, annotation, num_markers, logger):
+    """Top `num_markers` marker genes per cell type that also exist in ST."""
+    start = time.time()
+    adata_sc.layers["counts"] = adata_sc.X.copy()  # Used in contrastive learning
+    if "rank_genes_groups" not in adata_sc.uns:
+        if adata_sc.X.min() >= 0:  # If already logarithmized skip
+            sc.pp.normalize_total(adata_sc, target_sum=1e4)
+            sc.pp.log1p(adata_sc)
+        sc.tl.rank_genes_groups(
+            adata_sc, groupby=annotation, use_raw=False, method="t-test"
+        )
+    else:
+        logger.info("***d Using precalculated marker genes in input h5ad.")
+
+    markers_df = pd.DataFrame(adata_sc.uns["rank_genes_groups"]["names"]).iloc[
+        0:num_markers, :
+    ]
+    markers = list(np.unique(markers_df.melt().value.values))
+    markers_intersect = list(set(markers).intersection(adata_st.var.index))
+    logger.info(
+        f"Using {len(markers_intersect)} unique single cell marker genes that exist in ST dataset ({num_markers} per cell type)"
+    )
+    logger.info(f"Calculation of marker genes took {np.round(time.time() - start, 3):.2f}")
+    return markers_intersect
+
+
+def start_contrastive(args, adata_sc, adata_st, markers, filename, logger):
+    """Train and predict with the contrastive model in a separate process."""
+    from contrastive import contrastive_process
+
+    queue = mp.Queue()
+    proc = mp.Process(
+        target=contrastive_process,
+        kwargs=dict(
+            sc_path=args.sc_path,
+            st_path=args.st_path,
+            adata_sc=adata_sc[:, markers],
+            adata_st=adata_st[:, markers],
+            annotation_sc=args.annotation,
+            batch_size=args.batch_size,
+            epochs=args.epochs,
+            embedding_dim=args.emb_dim,
+            encoder_depth=args.enc_depth,
+            classifier_depth=args.class_depth,
+            filename=filename,
+            augmentation_perc=args.augmentation_perc,
+            logger=logger,
+            log_embeddings=args.log_embeddings,
+            queue=queue,
+        ),
+        name="Contrastive process",
+    )
+    proc.start()
+    return proc, queue
+
+
+def collect_contrastive(adata_st, proc, queue, with_confidence=True):
+    """Store contrastive results (FIFO order is defined in contrastive.py)."""
+    adata_st.obsm["probabilities_contrastive"] = queue.get()
+    adata_st.obs["CoDi_contrastive"] = queue.get()
+    if with_confidence:
+        adata_st.obs["CoDi_confidence_contrastive"] = np.round(
+            np.nanmax(adata_st.obsm["probabilities_contrastive"].to_numpy(), axis=1), 3
+        )
+    proc.join()
+
+
+def combine_predictions(adata_st, dist_prob_weight, use_contrastive):
+    """Final CoDi label: weighted sum of distance and contrastive probabilities."""
+    if not use_contrastive:
+        adata_st.obs["CoDi"] = adata_st.obs["CoDi_dist"]
+        adata_st.obs["CoDi_confidence"] = adata_st.obs["CoDi_confidence_dist"]
+        return
+
+    assert (
+        "probabilities_contrastive" in adata_st.obsm
+    ), "Missing 'probabilities_contrastive' in adata_st.obsm."
+    probabilities = (
+        adata_st.obsm["probabilities_contrastive"] * (1.0 - dist_prob_weight)
+    ).add(adata_st.obsm["probabilities_dist"] * dist_prob_weight)
+    adata_st.obsm["probabilities"] = probabilities
+
+    prob_values = probabilities.to_numpy()
+    adata_st.obs["CoDi"] = np.array(
+        probabilities.columns[np.nanargmax(prob_values, axis=1)]
+    ).astype("str")
+    adata_st.obs["CoDi_confidence"] = np.round(np.nanmax(prob_values, axis=1), 3)
+
+
+def output_path(args, extension):
+    """<out_path>/<ST file name>_CoDi_<distance>.<extension>"""
+    return os.path.join(
+        args.out_path,
+        os.path.basename(args.st_path).replace(
+            ".h5ad", f"_CoDi_{args.distance}.{extension}"
+        ),
+    )
+
+
+def save_results(adata_st, args, csv_columns):
+    adata_st.obs.index.name = "cell_id"
+    adata_st.obs[csv_columns].to_csv(output_path(args, "csv"))
+    adata_st.write_h5ad(output_path(args, "h5ad"))
 
 
 def plot_spatial(
@@ -138,28 +365,21 @@ def plot_spatial(
         - adata (AnnData): Annotated data object which represents the sample
         - annotation (str): adata.obs column used for grouping
         - ax (Axes): Axes object used for plotting
-        - spot_size (int): Size of the dot that represents a cell. We are passing it as a diameter of the spot, while
-                the plotting library uses radius therefore it is multiplied by 0.5
-        - palette (dict): Dictionary that represents a mapping between annotation categories and colors
+        - spot_size (int): Diameter of the dot that represents a cell (the plotting
+                library uses radius, therefore it is multiplied by 0.5)
+        - palette: Unused; float annotations always use the "coolwarm" colormap
         - title (str): Title of the figure
-
     """
-    palette = sns.color_palette("coolwarm", as_cmap=True)
-    s = spot_size * 0.5
-    data = adata
+    is_float = "float" in str(type(adata.obs[annotation].iloc[0])).lower()
     ax = sns.scatterplot(
-        data=data.obs,
+        data=adata.obs,
         hue=annotation,
-        x=data.obsm["spatial"][:, 0],
-        y=data.obsm["spatial"][:, 1],
+        x=adata.obsm["spatial"][:, 0],
+        y=adata.obsm["spatial"][:, 1],
         ax=ax,
-        s=s,
+        s=spot_size * 0.5,
         linewidth=0,
-        palette=(
-            palette
-            if ("float" in str(type(adata.obs[annotation].iloc[0])).lower())
-            else None
-        ),
+        palette=sns.color_palette("coolwarm", as_cmap=True) if is_float else None,
         marker=".",
     )
     ax.invert_yaxis()
@@ -169,312 +389,70 @@ def plot_spatial(
     sns.despine(bottom=True, left=True, ax=ax)
 
 
+def plot_results(adata_st, args):
+    fig, axs = plt.subplots(1, 2, figsize=(14, 14))
+    plot_spatial(adata_st, annotation="CoDi", spot_size=50, ax=axs[0], title="Cell types")
+    plot_spatial(
+        adata_st,
+        annotation="CoDi_confidence",
+        spot_size=50,
+        ax=axs[1],
+        title="Confidence map",
+    )
+    plt.savefig(output_path(args, "png"), dpi=120, bbox_inches="tight")
+
+
+# ---------------------------------------------------------------------------
+# Entry point
+# ---------------------------------------------------------------------------
 def main_proc(args, logger, filename):
     start = time.time()
+    use_contrastive = not args.no_contrastive
 
-    adata_sc = sc.read_h5ad(args.sc_path)
-    adata_st = sc.read_h5ad(args.st_path)
-    adata_sc.var_names_make_unique()
-    adata_st.var_names_make_unique()
-    adata_sc.obs_names_make_unique()
-    adata_st.obs_names_make_unique()
-
-    # place cell spatial coordinates in .obsm['spatial']
-    # coordinates are expected in 'spatial', 'X_spatial', and 'spatial_stereoseq'
-    if "X_spatial" in adata_st.obsm:
-        adata_st.obsm["spatial"] = adata_st.obsm["X_spatial"].copy()
-    elif "spatial_stereoseq" in adata_st.obsm:
-        adata_st.obsm["spatial"] = np.array(adata_st.obsm["spatial_stereoseq"].copy())
-    elif "spatial" in adata_st.obsm:
-        pass
-    else:
-        warnings.warn(
-            'Spatial coordinates not found. Labels expected in: \
-                .obsm["spatial"] or\n \
-                .obsm["X_spatial"] or\n \
-                .obsm["spatial_stereoseq"]'
-        )
-
-    # Calculate marker genes  TODO: Add to separate function in preprocessing.py
-    start_marker = time.time()
-    adata_sc.layers["counts"] = adata_sc.X.copy()  # Used in contrastive learning
-    if "rank_genes_groups" not in adata_sc.uns:
-        if adata_sc.X.min() >= 0:  # If already logaritmized skip
-            sc.pp.normalize_total(adata_sc, target_sum=1e4)
-            sc.pp.log1p(adata_sc)
-        sc.tl.rank_genes_groups(
-            adata_sc, groupby=args.annotation, use_raw=False, method="t-test"
-        )
-    else:
-        logger.info(f"***d Using precalculated marker genes in input h5ad.")
-
-    markers_df = pd.DataFrame(adata_sc.uns["rank_genes_groups"]["names"]).iloc[
-        0 : args.num_markers, :
-    ]
-
-    markers = list(np.unique(markers_df.melt().value.values))
-
-    markers_intersect = list(set(markers).intersection(adata_st.var.index))
-    logger.info(
-        f"Using {len(markers_intersect)} unique single cell marker genes that exist in ST dataset ({args.num_markers} per cell type)"
+    adata_sc, adata_st = load_data(args.sc_path, args.st_path)
+    markers = compute_marker_genes(
+        adata_sc, adata_st, args.annotation, args.num_markers, logger
     )
-    end_marker = time.time()
-    marker_time = np.round(end_marker - start_marker, 3)
-    logger.info(f"Calculation of marker genes took {marker_time:.2f}")
 
-    # Contrastive part
-    if not args.no_contrastive:
-        from contrastive import contrastive_process
-
-        queue = mp.Queue()
-
-        contrastive_proc = mp.Process(
-            target=contrastive_process,
-            kwargs=dict(
-                sc_path=args.sc_path,
-                st_path=args.st_path,
-                adata_sc=adata_sc[:, markers_intersect],
-                adata_st=adata_st[:, markers_intersect],
-                annotation_sc=args.annotation,
-                batch_size=args.batch_size,
-                epochs=args.epochs,
-                embedding_dim=args.emb_dim,
-                encoder_depth=args.enc_depth,
-                classifier_depth=args.class_depth,
-                filename=filename,
-                augmentation_perc=args.augmentation_perc,
-                logger=logger,
-                log_embeddings=args.log_embeddings,
-                queue=queue,
-            ),
-            name="Contrastive process",
+    if use_contrastive:
+        contrastive_proc, queue = start_contrastive(
+            args, adata_sc, adata_st, markers, filename, logger
         )
-        contrastive_proc.start()
 
     if args.distance == "none":
-        if not args.no_contrastive:
-            df_probabilities = queue.get()  # FIFO (ordering in contrastive.py)
-            adata_st.obsm["probabilities_contrastive"] = df_probabilities
-            predictions = queue.get()
-            adata_st.obs["CoDi_contrastive"] = predictions
-            contrastive_proc.join()
-            # Write CSV and H5AD  TODO: Add to separate function in core/util.py
-            adata_st.obs.index.name = "cell_id"
-            adata_st.obs["CoDi_contrastive"].to_csv(
-                os.path.join(
-                    args.out_path,
-                    os.path.basename(args.st_path).replace(
-                        ".h5ad", f"_CoDi_{args.distance}.csv"
-                    ),
-                )
-            )
-            adata_st.write_h5ad(
-                os.path.join(
-                    args.out_path,
-                    os.path.basename(args.st_path).replace(
-                        ".h5ad", f"_CoDi_{args.distance}.h5ad"
-                    ),
-                )
-            )
-        logger.info(f"No distance metric specified, exiting...")
-        end = time.time()
-        logger.info(f"Total execution time: {(end - start):.2f}s")
-        return  # TODO: Remove this and unite with same code for saving results
+        if use_contrastive:
+            collect_contrastive(adata_st, contrastive_proc, queue, with_confidence=False)
+            save_results(adata_st, args, "CoDi_contrastive")
+        logger.info("No distance metric specified, exiting...")
+        logger.info(f"Total execution time: {(time.time() - start):.2f}s")
+        return
 
-    # Extract gene expressions only from marker genes  TODO: add to separate function in core/preprocessing.py
-    select_ind = adata_sc.var.index.get_indexer(markers_intersect)
-    sc_df = (
-        adata_sc.X.tocsr()[:, select_ind].todense()
-        if issparse(adata_sc.X)
-        else adata_sc.X[:, select_ind]
-    )
-    sc_df = pd.DataFrame(sc_df, columns=markers_intersect, index=adata_sc.obs.index)
-    select_ind = adata_st.var.index.get_indexer(markers_intersect)
-    st_df = (
-        adata_st.X.tocsr()[:, select_ind].todense()
-        if issparse(adata_st.X)
-        else adata_st.X[:, select_ind]
-    )
-    st_df = pd.DataFrame(st_df, columns=markers_intersect, index=adata_st.obs.index)
-    cell_types = list(sorted(adata_sc.obs[args.annotation].unique()))
-    adata_st.obsm["probabilities_dist"] = pd.DataFrame(
-        index=adata_st.obs.index, columns=cell_types
-    ).astype("float32")
+    run_distance(args, adata_sc, adata_st, markers, logger)
+    if use_contrastive:
+        collect_contrastive(adata_st, contrastive_proc, queue)
+    combine_predictions(adata_st, args.dist_prob_weight, use_contrastive)
+    logger.info(f"CoDi execution took: {time.time() - start}s")
 
-    # Distance based algorithm TODO: Add to separate function in core/distance.py
-    # *****************************************
-    # Precalculate necessary subset matrices
-    # *****************************************
-    sc_icms = {}
-    sc_mean = {}
-    num_of_subsets = 10
-    subsets = create_subsets(markers_intersect, num_of_subsets=num_of_subsets)
-    for ty in cell_types:
-        sc_icms[ty] = []
-        sc_mean[ty] = []
-        ty_df = sc_df[adata_sc.obs[args.annotation] == ty]
-        for sub_id, subset in enumerate(subsets):
-            subset_df = ty_df[subset]
-            if args.distance == "mahalanobis":
-                cm = np.cov(
-                    subset_df.values, rowvar=False
-                )  # Calculate covariance matrix
-                sc_icms[ty].append(
-                    np.linalg.pinv(cm)
-                )  # Use pseudo inverse to avoid error singular matrix (determinant = 0)
-            sc_mean[ty].append(
-                subset_df.mean()
-            )  # ...because of presence of genes with all zero values per cell type
-
-    # Stack per-subset references into (n_cell_types, subset_size) matrices,
-    # normalized once here instead of once per ST cell
-    refs = []
-    for sub_id in range(num_of_subsets):
-        raw = [sc_mean[ty][sub_id].values.astype(float) for ty in cell_types]
-        refs.append(
-            {
-                "raw": np.vstack(raw),
-                "norm": np.vstack([normalize_distrib(r) for r in raw]),
-                "icms": [sc_icms[ty][sub_id] for ty in cell_types]
-                if args.distance == "mahalanobis"
-                else None,
-            }
-        )
-
-    # *****************************************
-    # For all ST cells, for all subsets, for all cell types
-    # *****************************************
-    num_cpus_used = mp.cpu_count() if args.n_jobs == -1 else args.n_jobs
-    worker_state = {
-        "distance": args.distance,
-        "cell_types": cell_types,
-        "st": st_df.to_numpy(),
-        "subset_idx": [st_df.columns.get_indexer(subset) for subset in subsets],
-        "refs": refs,
-    }
-
-    logger.info(f"Starting parallel per cell calculation of distances.")
-    with mp.Pool(
-        processes=num_cpus_used, initializer=init_worker, initargs=(worker_state,)
-    ) as pool:
-        assigned_types = pool.map(per_cell, range(len(st_df)), chunksize=30)
-
-    assigned_types = [at[1] for at in assigned_types]  # pool.map preserves order
-    adata_st.obs["CoDi_dist"] = [x["cell_type"] for x in assigned_types]
-    adata_st.obs["CoDi_confidence_dist"] = [x["confidence"] for x in assigned_types]
-    adata_st.obsm["probabilities_dist"].iloc[:, :] = [
-        x["ct_probabilities"] for x in assigned_types
-    ]
-
-    # sns.histplot([x["confidence"] for x in assigned_types])
-    # plt.savefig(f"CoDi_confidence_hist__{args.distance}.png", dpi=120, bbox_inches="tight")
-
-    if not args.no_contrastive:
-        df_probabilities = queue.get()  # FIFO (ordering in contrastive.py)
-        adata_st.obsm["probabilities_contrastive"] = df_probabilities
-        predictions = queue.get()
-        adata_st.obs["CoDi_contrastive"] = predictions
-        adata_st.obs["CoDi_confidence_contrastive"] = np.round(
-            np.nanmax(adata_st.obsm["probabilities_contrastive"].to_numpy(), axis=1), 3
-        )
-        contrastive_proc.join()
-
-    # combine contrastive and distance results TODO: Add to separate function in core/util.py
-    if not args.no_contrastive:
-        assert (
-            "probabilities_contrastive" in adata_st.obsm
-        ), "Missing 'probabilities_contrastive' in adata_st.obsm."
-        adata_st.obsm["probabilities"] = (
-            adata_st.obsm["probabilities_contrastive"] * (1.0 - args.dist_prob_weight)
-        ).add(adata_st.obsm["probabilities_dist"] * args.dist_prob_weight)
-        probabilities = adata_st.obsm["probabilities"]
-        prob_values = probabilities.to_numpy()
-        adata_st.obs["CoDi"] = np.array(
-            probabilities.columns[np.nanargmax(prob_values, axis=1)]
-        ).astype("str")
-        adata_st.obs["CoDi_confidence"] = np.round(np.nanmax(prob_values, axis=1), 3)
+    if use_contrastive:
+        csv_columns = [
+            "CoDi",
+            "CoDi_confidence",
+            "CoDi_dist",
+            "CoDi_confidence_dist",
+            "CoDi_contrastive",
+            "CoDi_confidence_contrastive",
+        ]
     else:
-        adata_st.obs["CoDi"] = adata_st.obs["CoDi_dist"]
-        adata_st.obs["CoDi_confidence"] = adata_st.obs["CoDi_confidence_dist"]
+        csv_columns = ["CoDi_dist", "CoDi_confidence_dist", "CoDi", "CoDi_confidence"]
+    save_results(adata_st, args, csv_columns)
 
-    end = time.time()
-    logger.info(f"CoDi execution took: {end - start}s")
+    if "spatial" in adata_st.obsm_keys():
+        plot_results(adata_st, args)
 
-    # Write CSV and H5AD
-    # TODO: Add to separate function in core/util.py that will work with or without contrastive or distance
-    adata_st.obs.index.name = "cell_id"
-    # Write CSV and H5AD of final combined results
-    if not args.no_contrastive:
-        adata_st.obs[
-            [
-                "CoDi",
-                "CoDi_confidence",
-                "CoDi_dist",
-                "CoDi_confidence_dist",
-                "CoDi_contrastive",
-                "CoDi_confidence_contrastive",
-            ]
-        ].to_csv(
-            os.path.join(
-                args.out_path,
-                os.path.basename(args.st_path).replace(
-                    ".h5ad", f"_CoDi_{args.distance}.csv"
-                ),
-            )
-        )
-    else:
-        adata_st.obs[
-            ["CoDi_dist", "CoDi_confidence_dist", "CoDi", "CoDi_confidence"]
-        ].to_csv(
-            os.path.join(
-                args.out_path,
-                os.path.basename(args.st_path).replace(
-                    ".h5ad", f"_CoDi_{args.distance}.csv"
-                ),
-            )
-        )
-    adata_st.write_h5ad(
-        os.path.join(
-            args.out_path,
-            os.path.basename(args.st_path).replace(
-                ".h5ad", f"_CoDi_{args.distance}.h5ad"
-            ),
-        )
-    )
-
-    if (
-        "spatial" in adata_st.obsm_keys()
-    ):  # TODO: Add to separate function in core/util.py
-        fig, axs = plt.subplots(1, 2, figsize=(14, 14))
-        plot_spatial(
-            adata_st, annotation=f"CoDi", spot_size=50, ax=axs[0], title="Cell types"
-        )
-        plot_spatial(
-            adata_st,
-            annotation=f"CoDi_confidence",
-            spot_size=50,
-            ax=axs[1],
-            title="Confidence map",
-        )
-        plt.savefig(
-            os.path.join(
-                args.out_path,
-                os.path.basename(args.st_path).replace(
-                    ".h5ad", f"_CoDi_{args.distance}.png"
-                ),
-            ),
-            dpi=120,
-            bbox_inches="tight",
-        )
-
-    end = time.time()
-    logger.info(f"Total execution time: {(end - start):.2f}s")
+    logger.info(f"Total execution time: {(time.time() - start):.2f}s")
 
 
-def main(args=None):
-    if not os.path.exists("logs"):
-        os.makedirs("logs")
-
+def parse_args():
     parser = ap.ArgumentParser(
         description="A script that performs CoDi - Contrastive-Distance reference based cell type annotation."
     )
@@ -497,23 +475,13 @@ def main(args=None):
         "--distance",
         help="Distance metric used to measure the distance between a point and a distribution of points",
         type=str,
-        required=False,
         default="KLD",
-        choices={
-            "mahalanobis",
-            "KLD",
-            "wasserstein",
-            "relativeEntropy",
-            "hellinger",
-            "binary",
-            "none",
-        },
+        choices=DISTANCE_METRICS,
     )
     parser.add_argument(
         "--num_markers",
         help="Number of marker genes per cell type.",
         type=int,
-        required=False,
         default=100,
     )
     parser.add_argument(
@@ -521,42 +489,36 @@ def main(args=None):
         help="Weight coefficient for probabilities obtained by distance metric. \
             Weight for contrastive is 1.0 - dist_prob_weight. Default is 0.5.",
         type=float,
-        required=False,
         default=0.5,
     )
     parser.add_argument(
         "--batch_size",
         help="Contrastive: Number of samples in the batch. Defaults to 512.",
         type=int,
-        required=False,
         default=512,
     )
     parser.add_argument(
         "--epochs",
         help="Contrastive: Number of epochs to train deep encoder. Default is 50.",
         type=int,
-        required=False,
         default=50,
     )
     parser.add_argument(
         "--emb_dim",
         help="Contrastive: Dimension of the output embeddings. Default is 32.",
         type=int,
-        required=False,
         default=32,
     )
     parser.add_argument(
         "--enc_depth",
         help="Contrastive: Number of layers in the encoder MLP. Default is 4.",
         type=int,
-        required=False,
         default=4,
     )
     parser.add_argument(
         "--class_depth",
         help="Contrastive: Number of layers in the classifier MLP. Default is 2.",
         type=int,
-        required=False,
         default=2,
     )
     parser.add_argument(
@@ -564,14 +526,12 @@ def main(args=None):
         help="Contrastive: Percentage for the augmentation of scRNA reference data. \
             If not provided it will be calculated automatically. Defaults to None.",
         type=float,
-        required=False,
         default=None,
     )
     parser.add_argument(
         "--n_jobs",
         help="Number of jobs to run in parallel. -1 means using all available processors.",
         type=int,
-        required=False,
         default=-1,
     )
     parser.add_argument(
@@ -587,7 +547,6 @@ def main(args=None):
         help="Save embeddings to disk as np array and create UMAP plots of ST and SC embeddings.",
     )
     parser.add_argument("-l", "--log_mem", action="store_true", default=False)
-
     parser.add_argument(
         "-v",
         "--verbose",
@@ -600,12 +559,13 @@ def main(args=None):
         "--out_path",
         help="Output path to store results.",
         type=str,
-        required=False,
         default="",
     )
+    return parser.parse_args()
 
-    args = parser.parse_args()
 
+def setup_logging(args):
+    """Configure logging. Returns (logger, log file path or None)."""
     logging.basicConfig(
         format="%(asctime)s %(name)-12s %(levelname)-8s %(message)s",
         level=args.verbose,
@@ -615,45 +575,49 @@ def main(args=None):
     filename = None
     if args.verbose != logging.WARNING:
         timestamp = datetime.datetime.now().strftime("%d_%m_%Y_%H_%M")
-        filename = os.path.basename(args.st_path).replace(".h5ad", "")
-        filename = os.path.join(args.out_path, f"logs/{filename}_{timestamp}.log")
-        if not os.path.exists(os.path.dirname(filename)):
-            os.makedirs(os.path.dirname(filename))
-        file_handler = logging.FileHandler(filename)
-        logger.addHandler(file_handler)
-    if args.log_mem:
-        mem_logger_fname = os.path.join(
-            args.out_path,
-            os.path.basename(args.st_path).replace(".h5ad", "_cpu_gpu_memlog.csv"),
-        )
-        if os.path.isfile(mem_logger_fname):
-            os.remove(mem_logger_fname)
+        st_name = os.path.basename(args.st_path).replace(".h5ad", "")
+        filename = os.path.join(args.out_path, f"logs/{st_name}_{timestamp}.log")
+        os.makedirs(os.path.dirname(filename), exist_ok=True)
+        logger.addHandler(logging.FileHandler(filename))
+    return logger, filename
 
-        logger_pid = subprocess.Popen(
-            [
-                "python",
-                "scripts/log_gpu_cpu_stats.py",
-                mem_logger_fname,
-            ]
-        )
-        logger.info("Started logging compute resource utilisation")
+
+def start_resource_logger(args, logger):
+    """Start the background CPU/GPU memory logger. Returns (process, CSV path)."""
+    mem_logger_fname = os.path.join(
+        args.out_path,
+        os.path.basename(args.st_path).replace(".h5ad", "_cpu_gpu_memlog.csv"),
+    )
+    if os.path.isfile(mem_logger_fname):
+        os.remove(mem_logger_fname)
+    proc = subprocess.Popen(["python", "scripts/log_gpu_cpu_stats.py", mem_logger_fname])
+    logger.info("Started logging compute resource utilisation")
+    return proc, mem_logger_fname
+
+
+def stop_resource_logger(proc, mem_logger_fname, logger):
+    proc.terminate()
+    print("Terminated the compute utilisation logger background process")
+    logger_df = pd.read_csv(mem_logger_fname)
+    max_cpu_mem = logger_df.loc[:, "RAM"].max()
+    max_gpu_mem = logger_df.loc[:, "GPU 0"].max()
+    logger.info(
+        f"Peak RAM Usage: {max_cpu_mem} MiB\nPeak GPU Usage: {max_gpu_mem} MiB\n"
+    )
+
+
+def main(args=None):
+    os.makedirs("logs", exist_ok=True)
+    args = parse_args()
+    logger, filename = setup_logging(args)
+
+    if args.log_mem:
+        mem_proc, mem_logger_fname = start_resource_logger(args, logger)
 
     main_proc(args=args, logger=logger, filename=filename)
 
     if args.log_mem:
-        # End the background process logging the CPU and GPU utilisation.
-        logger_pid.terminate()
-        print("Terminated the compute utilisation logger background process")
-
-        # read cpu and gpu memory utilization
-        logger_df = pd.read_csv(mem_logger_fname)
-
-        max_cpu_mem = logger_df.loc[:, "RAM"].max()
-        max_gpu_mem = logger_df.loc[:, "GPU 0"].max()
-
-        logger.info(
-            f"Peak RAM Usage: {max_cpu_mem} MiB\nPeak GPU Usage: {max_gpu_mem} MiB\n"
-        )
+        stop_resource_logger(mem_proc, mem_logger_fname, logger)
 
 
 if __name__ == "__main__":
